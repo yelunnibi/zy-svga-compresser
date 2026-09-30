@@ -1,0 +1,338 @@
+{
+  "name": "svgazip",
+  "displayName": "ZY SVGA Compresser",
+  "description": "Compress PNG/JPG/WebP/SVG/GIF/SVGA faster and better. Adds tunable SVGA compression (fps frame-dropping, texture resolution, canvas scaling), decoded-memory estimation, and one-click overwrite with automatic backup.",
+  "homepage": "https://github.com/AkiraBit/Mikas/blob/main/README.md",
+  "version": "0.0.8",
+  "license": "MIT",
+  "author": "JaylenLee",
+  "publisher": "zynigo",
+  "icon": "assets/icon.png",
+  "issues": "https://github.com/yelunnibi/zy-svga-compresser/issues",
+  "bugs": {
+    "url": "https://github.com/yelunnibi/zy-svga-compresser/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yelunnibi/zy-svga-compresser.git"
+  },
+  "keywords": [
+    "tinypng",
+    "TinyPNG",
+    "Tinypng",
+    "svg",
+    "SVG",
+    "SVGO",
+    "svgo",
+    "svga",
+    "SVGA",
+    "compress",
+    "image compress",
+    "decode memory",
+    "jpg",
+    "png",
+    "webp"
+  ],
+  "engines": {
+    "vscode": "^1.56.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets"
+  ],
+  "activationEvents": [
+    "onCommand:zy-svga.compress",
+    "onCommand:zy-svga.restoreLastBackup",
+    "onCommand:zy-svga.exportLog",
+    "onCommand:zy-svga.showLog",
+    "onView:zy-svga.sidebar"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "zy-svga-sidebar",
+          "title": "ZY SVGA Compresser",
+          "icon": "assets/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "zy-svga-sidebar": [
+        {
+          "id": "zy-svga.sidebar",
+          "name": "图像压缩",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "zy-svga.compress",
+        "title": "用 ZY SVGA 压缩"
+      },
+      {
+        "command": "zy-svga.restoreLastBackup",
+        "title": "ZY SVGA：还原上一次备份"
+      },
+      {
+        "command": "zy-svga.exportLog",
+        "title": "ZY SVGA：导出诊断日志到文件"
+      },
+      {
+        "command": "zy-svga.showLog",
+        "title": "ZY SVGA：打开日志输出面板"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "zy-svga.compress",
+          "when": "False"
+        },
+        {
+          "command": "zy-svga.restoreLastBackup"
+        },
+        {
+          "command": "zy-svga.exportLog"
+        },
+        {
+          "command": "zy-svga.showLog"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "when": "resourceExtname =~ /^\\.(png|jpe?g|webp|gif|svg|svga)$/i",
+          "command": "zy-svga.compress",
+          "group": "zy-svga@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "when": "resourceExtname =~ /^\\.(png|jpe?g|webp|gif|svg|svga)$/i",
+          "command": "zy-svga.compress",
+          "group": "zy-svga@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceExtname =~ /^\\.(png|jpe?g|webp|gif|svg|svga)$/i",
+          "command": "zy-svga.compress",
+          "group": "zy-svga@1"
+        },
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "zy-svga.compress",
+          "group": "zy-svga@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ZY SVGA Compresser",
+      "type": "object",
+      "properties": {
+        "zy-svga.tinypngApiKey": {
+          "order": 1,
+          "type": "string",
+          "markdownDescription": "TinyPNG API Key, [register](https://tinypng.com/developers)"
+        },
+        "zy-svga.forceOverwrite": {
+          "order": 2,
+          "type": "boolean",
+          "default": false,
+          "description": "Legacy option. When enabled and zy-svga.saveMode is not set, overwrite is used as the default save mode."
+        },
+        "zy-svga.compressedFilePostfix": {
+          "order": 3,
+          "type": "string",
+          "default": ".min",
+          "description": "Postfix which is appended to the compressed file unless you are forcing the extension to overwrite the source file."
+        },
+        "zy-svga.concurrency": {
+          "order": 4,
+          "type": "number",
+          "default": 6,
+          "description": "The maximum number of concurrent execution tasks is set to 6 by default. A large setting may increase Vscode's memory footprint."
+        },
+        "zy-svga.ignore": {
+          "order": 5,
+          "type": "string",
+          "default": "**/node_modules/**;\n**/.zy-svga/**;\n**/.git/**;",
+          "items": {
+            "type": "string"
+          },
+          "editPresentation": "multilineText",
+          "markdownDescription": "Specifies intentionally files that compressor should ignore. [Glob](https://en.wikipedia.org/wiki/Glob_(programming)) expressions are supported and must end in semicolons."
+        },
+        "zy-svga.saveMode": {
+          "order": 6,
+          "type": "string",
+          "enum": [
+            "copy",
+            "overwrite",
+            "overwriteWithBackup"
+          ],
+          "enumDescriptions": [
+            "Save as a .min copy, keep the original file untouched",
+            "Overwrite the original file directly, no backup (irreversible)",
+            "Overwrite the original file and back it up to .zy-svga/backup/ (recommended)"
+          ],
+          "default": "copy",
+          "markdownDescription": "Default way to write compressed results to disk. The panel lets you override this per action."
+        },
+        "zy-svga.svgaOptions": {
+          "order": 7,
+          "type": "object",
+          "default": {
+            "fps": {
+              "enabled": false,
+              "target": 0,
+              "keepDuration": true
+            },
+            "texture": {
+              "mode": "none",
+              "ratio": 1,
+              "maxEdge": 0
+            },
+            "canvas": {
+              "enabled": false,
+              "ratio": 1
+            },
+            "encode": {
+              "keepFormat": true,
+              "format": "png",
+              "quality": 80,
+              "palette": true
+            },
+            "reclaim": {
+              "enabled": false
+            }
+          },
+          "markdownDescription": "Global defaults for SVGA compression.\n\n- `fps.target` with `keepDuration: true` drops frames and keeps the duration unchanged, which is the only way to actually shrink the file.\n- `texture` resolution is the only setting that reduces decoded memory; `encode.quality` does not.\n- `reclaim.enabled` deletes textures that no sprite references any more. Frame dropping is what orphans them, so turning this on is what makes `fps` reduce decoded memory too.\n- `canvas.enabled` changes the playback size, so the host app has to be adjusted accordingly."
+        },
+        "zy-svga.memorySafeThreshold": {
+          "order": 8,
+          "type": "number",
+          "default": 30,
+          "markdownDescription": "Decoded memory (MB) below which an SVGA is considered safe."
+        },
+        "zy-svga.memoryDangerThreshold": {
+          "order": 9,
+          "type": "number",
+          "default": 80,
+          "markdownDescription": "Decoded memory (MB) above which an SVGA is flagged as high risk of OOM on low-end devices."
+        },
+        "zy-svga.memoryBudget": {
+          "order": 10,
+          "type": "number",
+          "default": 30,
+          "markdownDescription": "Target decoded memory (MB) used when generating texture scaling suggestions."
+        },
+        "zy-svga.backupKeep": {
+          "order": 11,
+          "type": "number",
+          "default": 20,
+          "markdownDescription": "How many backup batches to keep under .zy-svga/backup/. Older batches are pruned automatically."
+        },
+        "zy-svga.validateBeforeOverwrite": {
+          "order": 12,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Validate compressed SVGA output (decodable, textures intact) before overwriting the original file. Keep this enabled."
+        },
+        "zy-svga.logLevel": {
+          "order": 13,
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "default": "debug",
+          "markdownDescription": "Log verbosity. `debug` records every step of the compression pipeline (per-texture resize/encode, per-step timings, every file in a batch) — this is what you want when reporting a problem. Raise it only if the output gets too noisy. Takes effect after reloading the window."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "zy-svga",
+        "aliases": [
+          "ZY SVGA"
+        ],
+        "extensions": [
+          ".svga"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:uninstall": "node ./scripts/uninstall.js",
+    "postinstall": "cross-os postinstall",
+    "vscode:prepublish": "npm run build",
+    "compile": "webpack",
+    "watch": "cross-env NODE_ENV=development webpack --watch",
+    "dev:webview": "cd ./src/modules/image-compressor/webview && npm run dev",
+    "setup:native": "node bin/setup-native.js",
+    "build": "cross-os build",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package --out release"
+  },
+  "cross-os": {
+    "postinstall": {
+      "darwin": "chmod 755 ./bin/postinstall.sh && ./bin/postinstall.sh",
+      "win32": "powershell Set-ExecutionPolicy -Scope CurrentUser -executionpolicy Unrestricted && powershell ./bin/postinstall.ps1",
+      "linux": "chmod 755 ./bin/postinstall.sh && ./bin/postinstall.sh"
+    },
+    "build": {
+      "darwin": "chmod 755 ./bin/build.sh && ./bin/build.sh",
+      "win32": "powershell Set-ExecutionPolicy -Scope CurrentUser -executionpolicy Unrestricted && powershell ./bin/build.ps1",
+      "linux": "chmod 755 ./bin/build.sh && ./bin/build.sh"
+    }
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^20.19.43",
+    "@types/pako": "^2.0.0",
+    "@types/tar-fs": "^2.0.1",
+    "@types/vscode": "^1.51.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.8",
+    "@typescript-eslint/parser": "^5.59.8",
+    "@vscode/test-electron": "^2.3.2",
+    "copy-webpack-plugin": "^11.0.0",
+    "cpy-cli": "^5.0.0",
+    "cross-env": "^7.0.3",
+    "cross-os": "^1.5.0",
+    "eslint": "^8.41.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "node-loader": "2.0.0",
+    "patch-package": "^8.0.0",
+    "prettier": "^3.0.2",
+    "ts-loader": "^9.4.3",
+    "typescript": "^5.1.3",
+    "webpack": "^5.85.0",
+    "webpack-cli": "^5.1.1"
+  },
+  "dependencies": {
+    "cheerio": "1.0.0-rc.12",
+    "detect-libc": "^2.0.2",
+    "image-size": "^1.0.2",
+    "minimatch": "^9.0.3",
+    "nanoid": "^4.0.2",
+    "open": "^9.1.0",
+    "pako": "^2.1.0",
+    "protobufjs": "^7.2.5",
+    "sharp": "0.32.6",
+    "svgo": "^3.0.2",
+    "tapable": "^2.2.1",
+    "tar-fs": "^3.0.4",
+    "tinify": "1.7.1"
+  }
+}

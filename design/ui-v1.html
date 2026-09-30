@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-variant="A">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZY SVGA Compresser · 界面改版设计稿 v1</title>
+<style>
+/* ============================================================
+   主题变量：一套变量两种主题，避免原来的硬编码深色
+   ============================================================ */
+html[data-theme="dark"]{
+  --bg:#1e1e1e; --bg2:#181818; --side:#252526; --card:#252526; --card2:#2d2d2d;
+  --bd:#3c3c3c; --bd2:#4a4a4a; --fg:#cccccc; --fgH:#ffffff; --fgD:#8b8b8b;
+  --hover:#2a2d2e; --sel:#04395e; --inp:#313131;
+  --ac:#0e639c; --acH:#1177bb; --acFg:#ffffff;
+  --ok:#4ade80; --warn:#fbbf24; --bad:#f87171; --sky:#38bdf8;
+  --okBg:#1c2f22; --warnBg:#392f19; --badBg:#3a2020; --skyBg:#1b2c3a;
+  --shadow:0 8px 28px rgba(0,0,0,.55);
+}
+html[data-theme="light"]{
+  --bg:#ffffff; --bg2:#f8f8f8; --side:#f3f3f3; --card:#f8f8f8; --card2:#ffffff;
+  --bd:#e2e2e2; --bd2:#cfcfcf; --fg:#3b3b3b; --fgH:#111111; --fgD:#767676;
+  --hover:#e9e9e9; --sel:#cfe4f7; --inp:#ffffff;
+  --ac:#005fb8; --acH:#0078d4; --acFg:#ffffff;
+  --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --sky:#0284c7;
+  --okBg:#e7f6ec; --warnBg:#fdf3e0; --badBg:#fdeaea; --skyBg:#e6f2fa;
+  --shadow:0 8px 28px rgba(0,0,0,.16);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#101014; color:#ddd;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:13px; line-height:1.5; padding:0 0 60px;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+
+/* ============================================================ 展示用顶栏 */
+.pbar{
+  position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:14px;
+  padding:10px 18px; background:#0b0b0e; border-bottom:1px solid #26262c; flex-wrap:wrap;
+}
+.pbar .ttl{font-weight:600;color:#fff;font-size:13px;letter-spacing:.2px}
+.pbar .ttl small{color:#7d7d88;font-weight:400;margin-left:8px;font-size:11.5px}
+.pbar .grow{flex:1}
+.seg{display:inline-flex;background:#1b1b21;border:1px solid #2e2e36;border-radius:7px;padding:2px;gap:2px}
+.seg button{
+  border:0; background:transparent; color:#9a9aa6; font:inherit; font-size:12px;
+  padding:4px 11px; border-radius:5px; cursor:pointer; white-space:nowrap;
+}
+.seg button:hover{color:#ddd}
+.seg button.on{background:#3a3a44; color:#fff}
+.seg.sm button{padding:2px 8px;font-size:11px}
+.hintbar{padding:8px 18px;color:#8a8a95;font-size:11.5px;background:#0b0b0e;border-bottom:1px solid #1e1e24}
+.hintbar b{color:#c9c9d2;font-weight:600}
+
+.wrap{padding:18px;max-width:1560px;margin:0 auto}
+.artboard-label{display:flex;align-items:center;gap:10px;margin:6px 2px 10px;color:#9a9aa6;font-size:12px}
+.artboard-label b{color:#fff;font-size:13px}
+.artboard-label span.pill{background:#1b1b21;border:1px solid #2e2e36;border-radius:20px;padding:2px 10px;font-size:11px}
+
+/* ============================================================ VS Code 窗口外壳 */
+.win{
+  border:1px solid #2f2f37; border-radius:10px; overflow:hidden; background:var(--bg);
+  box-shadow:var(--shadow); color:var(--fg);
+}
+.titlebar{
+  height:30px; background:var(--side); border-bottom:1px solid var(--bd);
+  display:flex; align-items:center; gap:12px; padding:0 12px; color:var(--fgD); font-size:11.5px;
+}
+.tl{display:flex;gap:7px}
+.tl i{width:11px;height:11px;border-radius:50%;display:block}
+.tl i:nth-child(1){background:#ff5f57}.tl i:nth-child(2){background:#febc2e}.tl i:nth-child(3){background:#28c840}
+.workbench{display:flex; min-height:660px}
+
+/* 活动栏 */
+.activitybar{
+  width:48px; flex:0 0 48px; background:var(--side); border-right:1px solid var(--bd);
+  display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:2px;
+}
+.ab{width:48px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--fgD);position:relative;cursor:default}
+.ab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ab.mine{color:var(--fgH)}
+.ab.mine::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--ac);border-radius:0 2px 2px 0}
+.ab.placeholder{opacity:.35}
+
+/* VS Code 资源管理器（仅作上下文示意） */
+.explorer{width:214px;flex:0 0 214px;background:var(--side);border-right:1px solid var(--bd);display:flex;flex-direction:column}
+.ex-h{height:34px;display:flex;align-items:center;padding:0 12px;font-size:11px;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--fgD)}
+.ex-body{padding:2px 0;font-size:12.5px;overflow:auto}
+.ex-row{display:flex;align-items:center;gap:6px;height:23px;padding:0 10px;color:var(--fg);cursor:default;white-space:nowrap}
+.ex-row:hover{background:var(--hover)}
+.ex-row.lv2{padding-left:26px}
+.ex-row.sel{background:var(--sel);color:var(--fgH)}
+.ex-row .chev{color:var(--fgD);font-size:9px;width:9px}
+.ex-row .fi{width:14px;height:14px;flex:0 0 14px;border-radius:3px}
+.fi.png{background:linear-gradient(135deg,#6b9ec9,#4a7fa8)}
+.fi.svg{background:linear-gradient(135deg,#e0a458,#c8842f)}
+.fi.svga{background:linear-gradient(135deg,#5cb8a6,#3f8f80)}
+.fi.webp{background:linear-gradient(135deg,#9d7bd8,#7757b5)}
+.fi.fold{background:linear-gradient(135deg,#c9a24d,#a8832f);border-radius:3px}
+.ex-row .sz{margin-left:auto;color:var(--fgD);font-size:11px}
+.ex-row .warnmark{color:var(--warn);font-size:11px}
+
+/* ============================================================ 我们的面板 */
+.panel{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+
+/* 面板头 */
+.phead{
+  flex:0 0 auto;min-height:46px;display:flex;align-items:center;gap:10px;padding:7px 12px;
+  border-bottom:1px solid var(--bd);background:var(--card);
+}
+.brand{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.brand .lg{width:24px;height:24px;border-radius:6px;
+  background:linear-gradient(135deg,#025dbf,#0090d0 48%,#f2631c 52%,#f4a819);flex:0 0 24px}
+.brand .nm{font-size:12.5px;font-weight:600;color:var(--fgH);line-height:1.15}
+.brand .nm small{display:block;font-size:10.5px;color:var(--fgD);font-weight:400}
+.phead .grow{flex:1}
+.actbar{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.btn{
+  font:inherit;font-size:12px;display:inline-flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:5px;border:1px solid var(--bd2);background:transparent;
+  color:var(--fg);cursor:pointer;white-space:nowrap;
+}
+.btn:hover{background:var(--hover)}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:var(--acFg)}
+.btn.pri:hover{background:var(--acH);border-color:var(--acH)}
+.btn.dis{opacity:.42;cursor:not-allowed}
+.btn .k{font-size:10.5px;background:rgba(255,255,255,.18);border-radius:9px;padding:0 6px}
+.btn .car{font-size:9px;opacity:.8}
+.iconbtn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border-radius:5px;border:1px solid transparent;background:transparent;color:var(--fg);cursor:pointer}
+.iconbtn:hover{background:var(--hover);border-color:var(--bd2)}
+.iconbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* 面板主体 */
+.pbody{flex:1;min-height:0;display:flex}
+
+/* 左：文件队列 */
+.filelist{width:238px;flex:0 0 238px;border-right:1px solid var(--bd);background:var(--card2);display:flex;flex-direction:column}
+.fl-h{height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--bd);font-size:11.5px;color:var(--fgD)}
+.fl-h label{display:flex;align-items:center;gap:6px;color:var(--fg);cursor:pointer}
+.fl-h .cnt{margin-left:auto}
+.fl-body{flex:1;overflow:auto;padding:4px 0}
+.fr{display:flex;align-items:center;gap:7px;height:32px;padding:0 10px;cursor:pointer;position:relative}
+.fr:hover{background:var(--hover)}
+.fr.cur{background:var(--sel)}
+.fr.cur::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--ac)}
+.fr .cb{width:14px;height:14px;accent-color:var(--ac);flex:0 0 14px;cursor:pointer}
+.fr .chev{width:9px;color:var(--fgD);font-size:9px;flex:0 0 9px}
+.fr .fi{width:15px;height:15px;border-radius:3px;flex:0 0 15px}
+.fr .meta{min-width:0;flex:1}
+.fr .nm{font-size:12.5px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr.cur .nm{color:var(--fgH)}
+.fr .sub{font-size:10.5px;color:var(--fgD);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr .badge{flex:0 0 auto;font-size:10px;padding:1px 5px;border-radius:9px;white-space:nowrap}
+.b-none{background:var(--card);color:var(--fgD);border:1px solid var(--bd2)}
+.b-done{background:var(--okBg);color:var(--ok);border:1px solid transparent}
+.b-hot{background:var(--warnBg);color:var(--warn);border:1px solid transparent}
+.fr.indent .nm,.fr.indent .sub{}
+
+/* 中：预览舞台 */
+.stage{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.stage-h{flex:0 0 auto;height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--bd)}
+.stage-h .fn{font-size:12.5px;font-weight:600;color:var(--fgH)}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{font-size:10.5px;color:var(--fgD);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:1px 7px}
+.chip.warn{color:var(--warn);border-color:transparent;background:var(--warnBg)}
+.stage-h .grow{flex:1}
+
+.viewport{
+  flex:1;min-height:190px;position:relative;overflow:hidden;
+  background:
+    linear-gradient(45deg,var(--gridA) 25%,transparent 25%,transparent 75%,var(--gridA) 75%),
+    linear-gradient(45deg,var(--gridA) 25%,transparent 25%,transparent 75%,var(--gridA) 75%);
+  background-size:18px 18px;background-position:0 0,9px 9px;background-color:var(--gridB);
+  cursor:col-resize;
+}
+html[data-theme="dark"]{--gridA:#232323;--gridB:#1a1a1a}
+html[data-theme="light"]{--gridA:#eee;--gridB:#f7f7f7}
+.layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}
+.layer svg{max-width:100%;max-height:100%;width:auto;height:100%;border-radius:8px;
+  box-shadow:0 6px 22px rgba(0,0,0,.35)}
+.layer.after svg{filter:blur(.7px) saturate(1.06)}
+.layer.before{clip-path:inset(0 50% 0 0)}
+.tagtl{position:absolute;top:10px;font-size:10.5px;padding:2px 8px;border-radius:4px;
+  background:rgba(0,0,0,.62);color:#fff;pointer-events:none;letter-spacing:.3px}
+.tagtl.l{left:10px}.tagtl.r{right:10px}
+.divider{position:absolute;top:0;bottom:0;width:2px;background:var(--ac);left:50%;pointer-events:none}
+.divider::after{content:"";position:absolute;top:50%;left:50%;width:26px;height:26px;transform:translate(-50%,-50%);
+  border-radius:50%;background:var(--ac);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.viewport.single .divider{display:none}
+.viewport.single .layer.before,.viewport.single .layer.after{clip-path:none}
+.viewport.show-raw .layer.after{opacity:0}
+.viewport.show-raw .tagtl.r{opacity:.35}
+.viewport.show-opt .layer.before{opacity:0}
+
+/* 结果条 */
+.resultbar{flex:0 0 auto;border-top:1px solid var(--bd);background:var(--card2);
+  display:flex;gap:1px;flex-wrap:wrap}
+.stat{flex:1 1 148px;min-width:148px;padding:9px 12px;background:var(--card2)}
+.stat .lb{font-size:10.5px;color:var(--fgD);display:flex;align-items:center;gap:5px}
+.stat .vl{font-size:19px;font-weight:600;color:var(--fgH);line-height:1.25;margin-top:1px}
+.stat .sb{font-size:11px;color:var(--fgD)}
+.stat .sb b{color:var(--ok)}
+.stat .sb b.up{color:var(--bad)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 7px}
+.gaugebox{flex:2 1 250px;min-width:250px;padding:9px 12px;background:var(--card2)}
+.gauge{height:7px;border-radius:4px;overflow:hidden;display:flex;position:relative;background:var(--bd)}
+.gauge i{display:block}
+.g-safe{background:var(--ok)}.g-warn{background:var(--warn)}.g-bad{background:var(--bad)}
+.g-mark{position:absolute;top:-4px;width:3px;height:15px;background:var(--fgH);border-radius:2px;
+  transform:translateX(-50%);transition:left .12s}
+.gauge-lab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--fgD);margin-top:5px}
+.gauge-lab .mid{color:var(--warn)}
+.metarow{flex:1 1 100%;display:flex;gap:14px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid var(--bd);
+  font-size:11px;color:var(--fgD);background:var(--card2);align-items:center}
+.metarow b{color:var(--fg);font-weight:600}
+.metarow .advice{margin-left:auto;display:flex;gap:6px}
+.minibtn{font:inherit;font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid var(--bd2);
+  background:transparent;color:var(--fg);cursor:pointer}
+.minibtn:hover{background:var(--hover)}
+.minibtn.pri{background:var(--ac);border-color:var(--ac);color:var(--acFg)}
+
+/* 右：参数面板 */
+.params{width:296px;flex:0 0 296px;border-left:1px solid var(--bd);background:var(--card2);
+  display:flex;flex-direction:column;min-height:0;transition:width .18s}
+.params-h{flex:0 0 auto;height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--bd)}
+.params-h .t{font-size:12px;font-weight:600;color:var(--fgH)}
+.params-h .grow{flex:1}
+.groups{flex:1;overflow:auto;padding:0 12px 12px}
+.group{border-bottom:1px solid var(--bd)}
+.group>summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;
+  padding:10px 0 8px;font-size:12px;color:var(--fgH);font-weight:600;user-select:none;
+}
+.group>summary::-webkit-details-marker{display:none}
+.group>summary .chev{font-size:9px;color:var(--fgD);transition:transform .15s;transform:rotate(-90deg)}
+.group[open]>summary .chev{transform:rotate(0)}
+.tag{font-size:10px;font-weight:500;padding:0 5px;border-radius:3px;letter-spacing:.2px}
+.tag.size{background:var(--okBg);color:var(--ok)}
+.tag.mem{background:var(--skyBg);color:var(--sky)}
+.tag.dim{background:var(--card);color:var(--fgD);border:1px solid var(--bd2)}
+.gbody{padding:0 0 12px}
+.row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--fg);margin-bottom:7px}
+.row .grow{flex:1}
+.row .hint{font-size:11px;color:var(--fgD)}
+.inp{width:56px;background:var(--inp);border:1px solid var(--bd2);border-radius:4px;color:var(--fgH);
+  font:inherit;font-size:12px;padding:3px 6px;outline:none}
+.inp:focus{border-color:var(--ac)}
+.sw{width:30px;height:17px;border-radius:9px;background:var(--bd2);position:relative;cursor:pointer;
+  flex:0 0 30px;transition:background .16s}
+.sw i{position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .16s}
+.sw.on{background:var(--ac)}
+.sw.on i{left:15px}
+.sw.dis{opacity:.4;cursor:not-allowed}
+.radio{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--fg);margin-bottom:6px;cursor:pointer}
+.radio .rd{width:13px;height:13px;border-radius:50%;border:1px solid var(--bd2);flex:0 0 13px;position:relative;transition:border .15s}
+.radio.on .rd{border:4px solid var(--ac)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:16px;background:transparent;cursor:pointer;margin:2px 0 8px}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--bd2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+  background:var(--fgH);margin-top:-4.5px;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+html[data-theme="light"] input[type=range]::-webkit-slider-thumb{background:var(--ac)}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--bd2)}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:var(--ac)}
+.note{font-size:10.5px;color:var(--fgD);line-height:1.6;margin-bottom:8px}
+.note.ok{color:var(--ok)}
+.note.sky{color:var(--sky)}
+.note.warn{color:var(--warn)}
+.segfmt{display:flex;gap:4px;margin-bottom:8px}
+.segfmt button{flex:1;font:inherit;font-size:11px;padding:3px 0;border-radius:4px;border:1px solid var(--bd2);
+  background:transparent;color:var(--fg);cursor:pointer;text-transform:uppercase}
+.segfmt button.on{background:var(--ac);border-color:var(--ac);color:var(--acFg)}
+.params-f{flex:0 0 auto;padding:9px 12px;border-top:1px solid var(--bd);display:flex;flex-direction:column;gap:6px}
+.params-f .btn{justify-content:center;width:100%}
+
+/* 方案 B：参数下沉为底部抽屉，四列横排 */
+html[data-variant="B"] .pbody .params{display:none}
+.pdrawer{display:none;flex:0 0 auto;border-top:1px solid var(--bd);background:var(--card2)}
+html[data-variant="B"] .pdrawer{display:flex;flex-direction:column;max-height:250px}
+html[data-variant="B"] .params{width:100%;flex:1 1 auto;border-left:0;border-top:0;position:static}
+html[data-variant="B"] .groups{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:0 18px;align-content:start}
+html[data-variant="B"] .group{border-bottom:0;border-right:1px solid var(--bd);padding-right:16px}
+html[data-variant="B"] .group:last-child{border-right:0}
+html[data-variant="B"] .params-f{flex-direction:row;justify-content:flex-end;align-items:center}
+html[data-variant="B"] .params-f .btn{width:auto;min-width:140px}
+html[data-variant="B"] .params-h .scope-note{display:none}
+html:not([data-variant="B"]) .pdrawer{display:none}
+
+/* 面板底栏 */
+.pstatus{flex:0 0 auto;height:32px;display:flex;align-items:center;gap:12px;padding:0 12px;
+  border-top:1px solid var(--bd);background:var(--card);font-size:11.5px;color:var(--fgD)}
+.pstatus b{color:var(--fg)}
+.pstatus .sep{color:var(--bd2)}
+.pstatus .grow{flex:1}
+
+/* ============================================================ 右键菜单浮层 */
+.ctxmenu{
+  position:absolute;display:none;z-index:80;min-width:246px;
+  background:var(--side);border:1px solid var(--bd2);border-radius:6px;padding:4px;
+  box-shadow:var(--shadow);font-size:12.5px;color:var(--fg);
+}
+.ctxmenu.show{display:block}
+.ctxmenu .mi{display:flex;align-items:center;gap:8px;padding:5px 9px;border-radius:4px;white-space:nowrap}
+.ctxmenu .mi:hover{background:var(--hover)}
+.ctxmenu .mi .lb{flex:1}
+.ctxmenu .mi .kb{color:var(--fgD);font-size:11px}
+.ctxmenu .mi .sub{color:var(--fgD);font-size:10px}
+.ctxmenu .sep{height:1px;background:var(--bd);margin:4px 6px}
+.ctxmenu .mi.hl{background:var(--sel)}
+.ctxmenu .mi.hl .lb{color:var(--fgH);font-weight:600}
+.mine-badge{font-size:9.5px;background:var(--ac);color:#fff;border-radius:3px;padding:0 4px;letter-spacing:.3px}
+
+/* ============================================================ 说明区 */
+.notes{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.ncard{background:#141419;border:1px solid #26262c;border-radius:10px;padding:16px 18px}
+.ncard h3{font-size:13px;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.ncard h3 .n{width:20px;height:20px;border-radius:5px;background:#2b2b34;display:flex;align-items:center;
+  justify-content:center;font-size:11px;color:#cfcfd8}
+.ncard ul{margin:0;padding-left:18px;color:#a9a9b4;font-size:12.5px;line-height:1.85}
+.ncard li b{color:#e8e8ef;font-weight:600}
+.ncard li em{font-style:normal;color:#7dd3fc}
+.ncard.q{border-color:#3a3320;background:#1a1710}
+.ncard.q h3{color:#fcd34d}
+.ncard.q li b{color:#fde68a}
+</style>
+</head>
+<body>
+
+<!-- ===================== 展示顶栏 ===================== -->
+<div class="pbar">
+  <div class="ttl">ZY SVGA Compresser <small>界面改版设计稿 v1 · 可交互</small></div>
+  <div class="grow"></div>
+  <div class="seg" id="segVariant">
+    <button data-v="A" class="on">方案 A · 参数在右</button>
+    <button data-v="B">方案 B · 参数在下</button>
+  </div>
+  <div class="seg" id="segTheme">
+    <button data-t="dark" class="on">深色</button>
+    <button data-t="light">浅色</button>
+  </div>
+  <div class="seg" id="segMenu">
+    <button data-m="0" class="on">隐藏右键菜单</button>
+    <button data-m="1">演示右键菜单</button>
+  </div>
+</div>
+<div class="hintbar">这块是<b>展示用控制条</b>，不属于插件本体。请重点看下面的窗口；拖动预览区分隔线、拉动右侧参数滑块，数字会实时联动。</div>
+
+<div class="wrap">
+
+<div class="artboard-label">
+  <b>主界面</b>
+  <span class="pill">当前对象：hero.svga</span>
+  <span class="pill">已勾选 3 项</span>
+</div>
+
+<div class="win" id="win">
+  <!-- 标题栏 -->
+  <div class="titlebar">
+    <div class="tl"><i></i><i></i><i></i></div>
+    <span>project — Visual Studio Code</span>
+  </div>
+
+  <div class="workbench">
+    <!-- 活动栏 -->
+    <div class="activitybar">
+      <div class="ab placeholder" title="资源管理器">
+        <svg viewBox="0 0 24 24"><path d="M4 5h6l2 2h8v12H4z"/></svg>
+      </div>
+      <div class="ab placeholder" title="搜索">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+      </div>
+      <div class="ab placeholder" title="源代码管理">
+        <svg viewBox="0 0 24 24"><circle cx="7" cy="6" r="2.2"/><circle cx="7" cy="18" r="2.2"/><circle cx="17" cy="12" r="2.2"/><path d="M7 8.2v7.6M9.2 6h5.6a2.2 2.2 0 0 1 2.2 2.2v1.6"/></svg>
+      </div>
+      <div class="ab placeholder" title="扩展">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><path d="M16.5 13v7M13 16.5h7"/></svg>
+      </div>
+      <div class="grow" style="flex:1"></div>
+      <!-- 我们新增的图标 -->
+      <div class="ab mine" id="abMine" title="ZY SVGA Compresser">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3v5.5M8.6 6 12 8.5 15.4 6"/>
+          <path d="M12 21v-5.5M8.6 18 12 15.5 15.4 18"/>
+          <path d="M4.5 9.2h15M4.5 14.8h15"/>
+          <rect x="8.5" y="9.2" width="7" height="5.6" rx="1.2"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- VS Code 资源管理器（上下文示意 + 右键菜单演示） -->
+    <div class="explorer" style="position:relative">
+      <div class="ex-h">资源管理器</div>
+      <div class="ex-body" id="exBody">
+        <div class="ex-row"><span class="chev">▾</span><span class="fi fold"></span><span>project</span></div>
+        <div class="ex-row lv2"><span class="chev">▾</span><span class="fi fold"></span><span>assets</span></div>
+        <div class="ex-row lv2" style="padding-left:42px"><span class="fi png"></span><span>icon.png</span><span class="sz">12 KB</span></div>
+        <div class="ex-row lv2" style="padding-left:42px" id="exHero"><span class="fi svga"></span><span>hero.svga</span><span class="warnmark">●</span></div>
+        <div class="ex-row lv2" style="padding-left:42px"><span class="fi webp"></span><span>bg.webp</span><span class="sz">320 KB</span></div>
+        <div class="ex-row lv2" style="padding-left:42px"><span class="fi svg"></span><span>logo.svg</span><span class="sz">4.1 KB</span></div>
+        <div class="ex-row lv2"><span class="chev">▸</span><span class="fi fold"></span><span>lib</span></div>
+        <div class="ex-row lv2"><span class="fi png"></span><span>readme.md</span></div>
+      </div>
+
+      <!-- 右键菜单浮层 -->
+      <div class="ctxmenu" id="ctxmenu" style="left:150px;top:96px">
+        <div class="mi"><span class="lb">Open Preview</span></div>
+        <div class="mi"><span class="lb">Open With…</span></div>
+        <div class="sep"></div>
+        <div class="mi"><span class="lb">Download…</span></div>
+        <div class="mi"><span class="lb">Copy Path</span><span class="kb">⌥⌘C</span></div>
+        <div class="sep"></div>
+        <div class="mi hl"><span class="lb">用 ZY SVGA 压缩</span><span class="mine-badge">新增</span></div>
+        <div class="mi"><span class="lb">ZY SVGA：还原上一次备份</span></div>
+        <div class="sep"></div>
+        <div class="mi"><span class="lb">在访达中显示</span></div>
+        <div class="mi"><span class="lb">重命名…</span><span class="kb">↩</span></div>
+      </div>
+    </div>
+
+    <!-- 我们的面板 -->
+    <div class="panel">
+
+      <!-- 面板头 -->
+      <div class="phead">
+        <div class="brand">
+          <span class="lg"></span>
+          <span class="nm">ZY SVGA Compresser<small>图像与动画压缩</small></span>
+        </div>
+        <div class="grow"></div>
+        <div class="actbar">
+          <button class="btn pri" id="btnCompress">压缩 <span class="k num" id="btnScopeCnt">3 项</span></button>
+          <button class="btn" id="btnSave">保存 <span class="car">▾</span></button>
+          <button class="iconbtn" title="还原上一次备份">
+            <svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 2.3 5.7"/><path d="M4 4v6h6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 面板主体 -->
+      <div class="pbody">
+
+        <!-- 左：文件队列 -->
+        <div class="filelist">
+          <div class="fl-h">
+            <label><input type="checkbox" class="cb" id="checkAll" checked style="accent-color:var(--ac)">全选</label>
+            <span class="cnt num" id="flCnt">已勾选 3 / 6</span>
+          </div>
+          <div class="fl-body" id="flBody">
+            <div class="fr" data-name="assets" style="color:var(--fgD)">
+              <span class="cb" style="visibility:hidden"></span>
+              <span class="chev">▾</span><span class="fi fold" style="width:15px;height:15px;background:linear-gradient(135deg,#c9a24d,#a8832f);border-radius:3px"></span>
+              <span class="meta"><span class="nm">assets</span></span>
+            </div>
+            <div class="fr indent" data-name="icon.png" style="padding-left:30px">
+              <input type="checkbox" class="cb">
+              <span class="fi png" style="background:linear-gradient(135deg,#6b9ec9,#4a7fa8)"></span>
+              <span class="meta"><span class="nm">icon.png</span><span class="sub num">12 KB · 209×196</span></span>
+              <span class="badge b-none">待压缩</span>
+            </div>
+            <div class="fr indent cur" data-name="hero.svga" style="padding-left:30px">
+              <input type="checkbox" class="cb" checked>
+              <span class="fi svga" style="background:linear-gradient(135deg,#5cb8a6,#3f8f80)"></span>
+              <span class="meta"><span class="nm">hero.svga</span><span class="sub num">1.86 MB · 20fps · 120 帧</span></span>
+              <span class="badge b-hot">内存偏高</span>
+            </div>
+            <div class="fr indent" data-name="loading.svga" style="padding-left:30px">
+              <input type="checkbox" class="cb" checked>
+              <span class="fi svga" style="background:linear-gradient(135deg,#5cb8a6,#3f8f80)"></span>
+              <span class="meta"><span class="nm">loading.svga</span><span class="sub num">240 KB · 20fps · 40 帧</span></span>
+              <span class="badge b-none">待压缩</span>
+            </div>
+            <div class="fr indent" data-name="bg.webp" style="padding-left:30px">
+              <input type="checkbox" class="cb" checked>
+              <span class="fi webp" style="background:linear-gradient(135deg,#9d7bd8,#7757b5)"></span>
+              <span class="meta"><span class="nm">bg.webp</span><span class="sub num">320 KB → 188 KB</span></span>
+              <span class="badge b-done">已压缩</span>
+            </div>
+            <div class="fr indent" data-name="logo.svg" style="padding-left:30px">
+              <input type="checkbox" class="cb">
+              <span class="fi svg" style="background:linear-gradient(135deg,#e0a458,#c8842f)"></span>
+              <span class="meta"><span class="nm">logo.svg</span><span class="sub num">4.1 KB</span></span>
+              <span class="badge b-none">待压缩</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中：预览舞台 -->
+        <div class="stage">
+          <div class="stage-h">
+            <span class="fn" id="stageFn">hero.svga</span>
+            <div class="chips">
+              <span class="chip num">750 × 1334</span>
+              <span class="chip num" id="chipFps">20 fps · 120 帧 · 6.0s</span>
+              <span class="chip num" id="chipTex">40 张纹理 · 最大 900×900</span>
+            </div>
+            <div class="grow"></div>
+            <div class="seg sm" id="segPreview">
+              <button data-p="split" class="on">分屏对比</button>
+              <button data-p="raw">原图</button>
+              <button data-p="opt">压缩后</button>
+            </div>
+          </div>
+
+          <div class="viewport" id="viewport">
+            <div class="layer before" id="layerBefore">
+              <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <linearGradient id="bgG" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#16233f"/><stop offset="1" stop-color="#3a1c4c"/>
+                  </linearGradient>
+                  <linearGradient id="coinG" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#f9d35c"/><stop offset="1" stop-color="#ee8a2b"/>
+                  </linearGradient>
+                  <radialGradient id="glowG">
+                    <stop offset="0" stop-color="#ffd76a" stop-opacity=".5"/>
+                    <stop offset="1" stop-color="#ffd76a" stop-opacity="0"/>
+                  </radialGradient>
+                </defs>
+                <rect width="400" height="400" fill="url(#bgG)"/>
+                <circle cx="200" cy="176" r="152" fill="url(#glowG)"/>
+                <ellipse cx="200" cy="332" rx="148" ry="24" fill="#0c1428" opacity=".75"/>
+                <circle cx="200" cy="176" r="88" fill="url(#coinG)"/>
+                <circle cx="200" cy="176" r="88" fill="none" stroke="#fff3c9" stroke-width="5" opacity=".55"/>
+                <circle cx="200" cy="176" r="67" fill="none" stroke="#dd8f26" stroke-width="3" opacity=".75"/>
+                <path d="M200 132l14.2 34.4 36.8 3.2-27.6 24.3 8.2 35.6L200 211l-31.6 18.5 8.2-35.6-27.6-24.3 36.8-3.2z" fill="#fff7dd"/>
+                <g fill="#ffe9a8">
+                  <path d="M92 96l3.4 8.6L104 108l-8.6 3.4L92 120l-3.4-8.6L80 108l8.6-3.4z"/>
+                  <path d="M312 118l2.6 6.6 6.6 2.6-6.6 2.6-2.6 6.6-2.6-6.6-6.6-2.6 6.6-2.6z" opacity=".85"/>
+                  <path d="M300 268l2.2 5.6 5.6 2.2-5.6 2.2-2.2 5.6-2.2-5.6-5.6-2.2 5.6-2.2z" opacity=".7"/>
+                  <path d="M108 262l1.9 4.8 4.8 1.9-4.8 1.9-1.9 4.8-1.9-4.8-4.8-1.9 4.8-1.9z" opacity=".65"/>
+                </g>
+              </svg>
+            </div>
+            <div class="layer after" id="layerAfter">
+              <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <linearGradient id="bgG2" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#16233f"/><stop offset="1" stop-color="#3a1c4c"/>
+                  </linearGradient>
+                  <linearGradient id="coinG2" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#f9d35c"/><stop offset="1" stop-color="#ee8a2b"/>
+                  </linearGradient>
+                  <radialGradient id="glowG2">
+                    <stop offset="0" stop-color="#ffd76a" stop-opacity=".5"/>
+                    <stop offset="1" stop-color="#ffd76a" stop-opacity="0"/>
+                  </radialGradient>
+                </defs>
+                <rect width="400" height="400" fill="url(#bgG2)"/>
+                <circle cx="200" cy="176" r="152" fill="url(#glowG2)"/>
+                <ellipse cx="200" cy="332" rx="148" ry="24" fill="#0c1428" opacity=".75"/>
+                <circle cx="200" cy="176" r="88" fill="url(#coinG2)"/>
+                <circle cx="200" cy="176" r="88" fill="none" stroke="#fff3c9" stroke-width="5" opacity=".55"/>
+                <circle cx="200" cy="176" r="67" fill="none" stroke="#dd8f26" stroke-width="3" opacity=".75"/>
+                <path d="M200 132l14.2 34.4 36.8 3.2-27.6 24.3 8.2 35.6L200 211l-31.6 18.5 8.2-35.6-27.6-24.3 36.8-3.2z" fill="#fff7dd"/>
+                <g fill="#ffe9a8">
+                  <path d="M92 96l3.4 8.6L104 108l-8.6 3.4L92 120l-3.4-8.6L80 108l8.6-3.4z"/>
+                  <path d="M312 118l2.6 6.6 6.6 2.6-6.6 2.6-2.6 6.6-2.6-6.6-6.6-2.6 6.6-2.6z" opacity=".85"/>
+                  <path d="M300 268l2.2 5.6 5.6 2.2-5.6 2.2-2.2 5.6-2.2-5.6-5.6-2.2 5.6-2.2z" opacity=".7"/>
+                  <path d="M108 262l1.9 4.8 4.8 1.9-4.8 1.9-1.9 4.8-1.9-4.8-4.8-1.9 4.8-1.9z" opacity=".65"/>
+                </g>
+              </svg>
+            </div>
+            <span class="tagtl l">原图 900×900</span>
+            <span class="tagtl r">压缩后 <span id="tagRes">450×450</span></span>
+            <div class="divider" id="divider" style="left:50%"></div>
+          </div>
+
+          <!-- 结果条 -->
+          <div class="resultbar">
+            <div class="stat">
+              <div class="lb">文件体积</div>
+              <div class="vl num" id="vSize">—</div>
+              <div class="sb num" id="sSize">—</div>
+            </div>
+            <div class="stat">
+              <div class="lb">解码内存 <span class="dot" id="riskDot"></span><span id="riskTxt"></span></div>
+              <div class="vl num" id="vMem">—</div>
+              <div class="sb num" id="sMem">—</div>
+            </div>
+            <div class="gaugebox">
+              <div class="lb" style="font-size:10.5px;color:var(--fgD);margin-bottom:6px">解码内存阈值</div>
+              <div class="gauge"><i class="g-safe" style="width:17.86%"></i><i class="g-warn" style="width:29.76%"></i><i class="g-bad" style="width:52.38%"></i><u class="g-mark" id="gMark"></u></div>
+              <div class="gauge-lab num"><span>安全 30 MB</span><span class="mid">危险 80 MB</span><span>168 MB</span></div>
+            </div>
+            <div class="metarow">
+              <span>帧数 <b class="num" id="mFrames">—</b></span>
+              <span>时长 <b class="num" id="mDur">—</b></span>
+              <span>纹理 <b class="num" id="mTex">—</b></span>
+              <span>单张最大 <b class="num" id="mMaxTex">—</b></span>
+              <span class="advice">
+                <button class="minibtn" id="btnAdvice">想让内存降到 30 MB 以内？</button>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右：参数（方案 A 在此；方案 B 会被移到下方抽屉） -->
+        <aside class="params" id="params">
+          <div class="params-h">
+            <span class="t">压缩参数</span>
+            <div class="grow"></div>
+            <div class="seg sm" id="segScope">
+              <button data-s="global" class="on">全局默认</button>
+              <button data-s="file">仅此文件</button>
+            </div>
+          </div>
+          <div class="groups">
+            <details class="group" open>
+              <summary><span class="chev">▾</span>帧率 <em class="tag size">体积</em></summary>
+              <div class="gbody">
+                <div class="row"><span>目标 fps</span><span class="grow"></span>
+                  <input type="number" class="inp num" id="fpsTarget" value="10" min="1" max="120">
+                  <span class="hint num">原 20</span>
+                </div>
+                <div class="row"><span>保持原时长</span><span class="grow"></span>
+                  <span class="sw on" id="swKeep"><i></i></span>
+                </div>
+                <div class="note">开：抽掉多余帧，时长不变，体积真降 · 关：只改 fps 数值，动画变速，体积几乎不变</div>
+                <div class="note sky num" id="fpsEcho">—</div>
+              </div>
+            </details>
+
+            <details class="group" open>
+              <summary><span class="chev">▾</span>纹理分辨率 <em class="tag size">体积</em><em class="tag mem">内存</em></summary>
+              <div class="gbody">
+                <div class="radio" data-tm="none"><span class="rd"></span><span>不缩放</span></div>
+                <div class="radio on" data-tm="ratio"><span class="rd"></span><span>等比缩放</span>
+                  <span class="grow"></span><span class="num" style="color:var(--fgH);font-weight:600" id="texRatioVal">50%</span>
+                </div>
+                <input type="range" id="texRatio" min="10" max="100" value="50">
+                <div class="radio" data-tm="maxEdge"><span class="rd"></span><span>最长边不超过</span>
+                  <span class="grow"></span>
+                  <input type="number" class="inp num" id="texMaxEdge" value="512" min="16" style="width:62px">
+                  <span class="hint">px</span>
+                </div>
+                <div class="note">只有缩放纹理分辨率才降低解码内存</div>
+              </div>
+            </details>
+
+            <details class="group">
+              <summary><span class="chev">▾</span>画布与布局 <em class="tag dim">播放尺寸</em></summary>
+              <div class="gbody">
+                <div class="row"><span>同步缩放布局坐标</span><span class="grow"></span>
+                  <span class="sw" id="swCanvas"><i></i></span>
+                </div>
+                <div class="row"><span>画布比例</span><span class="grow"></span>
+                  <span class="num" style="color:var(--fgH);font-weight:600" id="cvVal">80%</span>
+                </div>
+                <input type="range" id="cvRatio" min="10" max="100" value="80">
+                <div class="note warn">只改播放尺寸，不省体积也不省内存——接入端需要同步调整</div>
+              </div>
+            </details>
+
+            <details class="group">
+              <summary><span class="chev">▾</span>图片编码 <em class="tag size">体积</em></summary>
+              <div class="gbody">
+                <div class="row"><span>保持原格式</span><span class="grow"></span>
+                  <span class="sw on" id="swKeepFmt"><i></i></span>
+                </div>
+                <div class="segfmt" id="segFmt" style="opacity:.4;pointer-events:none">
+                  <button data-f="png" class="on">PNG</button>
+                  <button data-f="jpeg">JPEG</button>
+                  <button data-f="webp">WEBP</button>
+                </div>
+                <div class="row"><span>编码质量</span><span class="grow"></span>
+                  <span class="num" style="color:var(--fgH);font-weight:600" id="qVal">70</span>
+                </div>
+                <input type="range" id="qRange" min="1" max="100" value="70">
+                <div class="row"><span>PNG 调色板量化</span><span class="grow"></span>
+                  <span class="sw on" id="swPalette"><i></i></span>
+                </div>
+                <div class="note">调质量只压体积，不降内存</div>
+              </div>
+            </details>
+          </div>
+          <div class="params-f">
+            <button class="btn pri" id="btnApply">应用到勾选的 3 项</button>
+            <button class="btn" id="btnReset">恢复为全局参数</button>
+          </div>
+        </aside>
+      </div>
+
+      <!-- 方案 B 的底部抽屉 -->
+      <div class="pdrawer" id="pdrawer"></div>
+
+      <!-- 面板底栏 -->
+      <div class="pstatus">
+        <span>共 <b class="num">6</b> 项</span>
+        <span class="sep">|</span>
+        <span>合计 <b class="num">2.42 MB</b></span>
+        <span class="sep">|</span>
+        <span>压缩后 <b class="num" id="stTotal">—</b></span>
+        <span class="sep">|</span>
+        <span>已省 <b class="num" id="stSaved">—</b></span>
+        <span class="sep">|</span>
+        <span>备份 <b class="num">3</b> 批 · 最近 14:02</span>
+        <span class="grow"></span>
+        <span>TinyPNG 用量 <b class="num">0 / 500</b></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 说明区 ===================== -->
+<div class="notes">
+  <div class="ncard">
+    <h3><span class="n">1</span>这版改了什么（相对现状）</h3>
+    <ul>
+      <li><b>动作不再重复</b>。原来顶部有「压缩选中 / 保存为副本 / 覆盖原文件」，底部又有「保存当前为副本 / 覆盖当前并备份」——同一件事两个入口。现在只剩 <em>压缩</em>（试算，不落盘）和 <em>保存 ▾</em>（落盘，三种模式收进下拉）。</li>
+      <li><b>「对谁生效」写进按钮</b>。勾了文件就显示「压缩 · 3 项」，没勾就是「压缩当前」，不用再猜。</li>
+      <li><b>参数面板加宽到 296px</b>（原 220px），控件不再挤成两三行。分组可折叠，非 SVGA 文件时不再留一块空白说明。</li>
+      <li><b>预览区还给预览</b>。原来下面那块数据区最高占 46% 且自己滚动，把预览越挤越小；现在数据压成一条横排结果条。</li>
+      <li><b>体积与内存并排同权重</b>，内存带阈值标尺。这是这个工具唯一真正"危险"的指标。</li>
+      <li><b>改用主题变量</b>。原代码把 <code>#333 / #252526</code> 硬编码，浅色主题下整个面板是黑的——点右上角「浅色」可验证。</li>
+    </ul>
+  </div>
+
+  <div class="ncard q">
+    <h3><span class="n">?</span>需要你拍板的 5 件事</h3>
+    <ul>
+      <li><b>参数放哪</b>：右上角切「方案 A / 方案 B」。A = 右侧常驻栏；B = 底部抽屉四列横排，预览更大。我倾向 <em>B</em>，因为参数是"调一次就不动"的东西，不值得长期占 296px 宽。</li>
+      <li><b>「画布与布局」的标注</b>：现在标的是「体积 + 内存」，但我核对过实现——它只缩放坐标，不动纹理像素，<em>两个指标都不省</em>。我改成标「播放尺寸」。你认不认这个判断？</li>
+      <li><b>丢帧能否省内存</b>：严格说，抽掉帧后若某些纹理已无引用，仍会留在包里被解码。要真省内存就得同时清理无引用纹理。现在只标了「体积」。要不要我加上纹理回收？</li>
+      <li><b>结果条要不要常驻</b>：现在是预览下方一条。也可以做成悬浮在预览右下角的小卡，预览区再大一点。</li>
+      <li><b>底部状态栏</b>：现在还有 6 项统计 + 备份 + TinyPNG 用量，信息偏杂。要不要精简成 3 项？</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var MB = 1024*1024;
+  var S = {
+    variant:"A", theme:"dark", preview:"split", split:50,
+    fpsEnabled:true, fpsTarget:10, keepDuration:true,
+    texMode:"ratio", texRatio:0.5, texMaxEdge:512,
+    canvas:false, canvasRatio:0.8,
+    keepFormat:true, format:"png", quality:70, palette:true,
+    scope:"global",
+    /* 演示用样本数据 */
+    baseSize:1.86*MB, baseMem:129.6*MB,
+    textures:40, maxEdge:900, singleTexMax:3.12*MB,
+    originFps:20, originFrames:120, canvasW:750, canvasH:1334,
+    safe:30*MB, danger:80*MB, gaugeMax:168*MB, budget:30*MB
+  };
+
+  function $(id){ return document.getElementById(id); }
+
+  function fmtSize(b){
+    if(b>=MB) return (b/MB).toFixed(2)+" MB";
+    if(b>=1024) return Math.round(b/1024)+" KB";
+    return Math.round(b)+" B";
+  }
+  function fmtMem(b){
+    if(b>=MB) return (b/MB).toFixed(1)+" MB";
+    return Math.round(b/1024)+" KB";
+  }
+  function pct(before, after){
+    if(!before) return 0;
+    return Math.round((1-after/before)*100);
+  }
+
+  /* 纹理缩放系数 */
+  function texScale(){
+    if(S.texMode==="none") return 1;
+    if(S.texMode==="ratio") return S.texRatio;
+    if(S.texMaxEdge>=S.maxEdge) return 1;
+    return Math.max(0.05, S.texMaxEdge/S.maxEdge);
+  }
+  /* 丢帧计算：沿用引擎里的整数步长逻辑 */
+  function framePlan(){
+    var o=S.originFps, t=S.fpsTarget;
+    if(!S.fpsEnabled || !t || t>=o) return {frames:S.originFrames, fps:o, step:1, dropped:false};
+    if(!S.keepDuration) return {frames:S.originFrames, fps:t, step:1, dropped:false, speedChanged:true};
+    var step=Math.max(1, Math.round(o/t));
+    return {frames:Math.ceil(S.originFrames/step), fps:Math.round(o/step*100)/100, step:step, dropped:true};
+  }
+  /* 体积估算：抽帧与纹理缩放为乘性衰减，质量按幂次缩放 */
+  function sizeAfter(){
+    var fp=framePlan(), fr=fp.frames/S.originFrames, ts=texScale();
+    var q=Math.pow(S.quality/70, 1.5);
+    return S.baseSize*(0.35+0.65*fr)*(0.30+0.70*Math.pow(ts,1.3))*q;
+  }
+  /* 解码内存：只由纹理像素决定 = Σ(w×h)×4，与画布、质量、帧数无关 */
+  function memAfter(){ return S.baseMem*Math.pow(texScale(),2); }
+
+  function risk(b){
+    if(b<=S.safe) return "safe";
+    if(b<=S.danger) return "caution";
+    return "danger";
+  }
+  var RISK={safe:{c:"var(--ok)",t:"安全"},caution:{c:"var(--warn)",t:"偏高"},danger:{c:"var(--bad)",t:"高风险"}};
+
+  function render(){
+    var fp=framePlan(), mem=memAfter(), size=sizeAfter(), ts=texScale();
+    var duration=fp.fps>0 ? (fp.frames/fp.fps) : 0;
+    var r=risk(mem), rm=RISK[r];
+
+    /* 体积 */
+    $("vSize").textContent=fmtSize(size);
+    $("sSize").innerHTML=fmtSize(S.baseSize)+' → <b>−'+pct(S.baseSize,size)+'%</b>';
+
+    /* 内存 */
+    $("vMem").textContent=fmtMem(mem);
+    $("vMem").style.color=rm.c;
+    $("sMem").innerHTML=fmtMem(S.baseMem)+' → <b>−'+pct(S.baseMem,mem)+'%</b>';
+    $("riskDot").style.background=rm.c;
+    $("riskTxt").textContent=rm.t;
+    $("riskTxt").style.color=rm.c;
+
+    /* 标尺游标 */
+    var pos=Math.min(100, mem/S.gaugeMax*100);
+    $("gMark").style.left=pos+"%";
+
+    /* 元信息 */
+    $("mFrames").textContent=S.originFrames+" → "+fp.frames;
+    $("mDur").textContent=duration.toFixed(1)+"s";
+    var tw=Math.round(S.maxEdge*ts), th=tw;
+    $("mTex").textContent=S.textures+" 张";
+    $("mMaxTex").textContent=(tw)+"×"+(th);
+    $("tagRes").textContent=tw+"×"+th;
+    $("chipFps").textContent=fp.fps+" fps · "+fp.frames+" 帧 · "+duration.toFixed(1)+"s";
+    $("chipTex").textContent=S.textures+" 张纹理 · 最大 "+tw+"×"+th;
+
+    /* 帧率回显 */
+    var e=$("fpsEcho");
+    if(fp.speedChanged){
+      e.textContent="实际生效 "+fp.fps+" fps · 帧数不变 · 时长变为 "+duration.toFixed(1)+"s";
+    }else if(fp.dropped){
+      e.textContent="实际生效 "+fp.fps+" fps · 帧数 "+S.originFrames+" → "+fp.frames+" · 时长 "+duration.toFixed(1)+"s（未变）";
+    }else{
+      e.textContent="未丢帧，帧率与原文件一致"; e.className="note sky num";
+    }
+    if(fp.dropped||fp.speedChanged) e.className="note sky num";
+
+    /* 纹理面板数值 */
+    $("texRatioVal").textContent=Math.round(S.texRatio*100)+"%";
+
+    /* 底栏汇总 */
+    var total=2.42*MB;
+    var savedRatio = 1 - (size/S.baseSize);
+    var est = total - (S.baseSize - size)*0.62;
+    $("stTotal").textContent=fmtSize(Math.max(0, est));
+    $("stSaved").textContent=fmtSize(Math.max(0, total-est));
+
+    /* 建议按钮：目标内存反推纹理比例 */
+    var need=Math.sqrt(S.budget/S.baseMem);
+    var btn=$("btnAdvice");
+    if(mem>S.budget){
+      btn.textContent="按建议重压 → 纹理 "+Math.round(need*100)+"%（内存 "+(S.budget/MB).toFixed(0)+" MB）";
+      btn.classList.add("pri");
+    }else{
+      btn.textContent="内存已在预算内（"+(S.budget/MB).toFixed(0)+" MB）";
+      btn.classList.remove("pri");
+    }
+
+    /* 预览分隔线 */
+    if(S.preview==="split"){
+      $("viewport").className="viewport";
+      // 分屏：左侧露原图，右侧露压缩后
+      $("layerBefore").style.clipPath="inset(0 "+(100-S.split)+"% 0 0)";
+      $("divider").style.left=S.split+"%";
+    }else{
+      // 单选模式必须清掉行内样式，否则会盖过 .viewport.single 的 CSS 规则
+      $("layerBefore").style.clipPath="";
+      $("viewport").className="viewport single "+(S.preview==="raw"?"show-raw":"show-opt");
+    }
+  }
+
+  /* ---------------- 交互绑定 ---------------- */
+
+  // 顶部：方案 / 主题 / 右键菜单
+  $("segVariant").addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+    S.variant=b.dataset.v;
+    document.documentElement.setAttribute("data-variant",S.variant);
+    var p=$("params"), d=$("pdrawer");
+    if(S.variant==="B"){ d.appendChild(p); } else { p.parentNode.removeChild(p); document.querySelector(".pbody").appendChild(p); }
+  });
+  $("segTheme").addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+    S.theme=b.dataset.t; document.documentElement.setAttribute("data-theme",S.theme);
+  });
+  $("segMenu").addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+    $("ctxmenu").classList.toggle("show", b.dataset.m==="1");
+    $("exHero").classList.toggle("sel", b.dataset.m==="1");
+  });
+
+  // 预览模式
+  $("segPreview").addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+    S.preview=b.dataset.p; render();
+  });
+
+  // 分屏拖动
+  var vp=$("viewport"), dragging=false;
+  function setSplit(clientX){
+    var r=vp.getBoundingClientRect();
+    var x=Math.max(0,Math.min(r.width, clientX-r.left));
+    S.split=Math.max(3,Math.min(97, x/r.width*100)); render();
+  }
+  vp.addEventListener("pointerdown",function(e){ dragging=true; vp.setPointerCapture(e.pointerId); setSplit(e.clientX); });
+  vp.addEventListener("pointermove",function(e){ if(dragging) setSplit(e.clientX); });
+  vp.addEventListener("pointerup",function(e){ dragging=false; try{vp.releasePointerCapture(e.pointerId);}catch(_){} });
+
+  // 开关
+  function bindSwitch(id, key, onChange){
+    var el=$(id);
+    el.addEventListener("click",function(){
+      if(el.classList.contains("dis")) return;
+      var v=!el.classList.contains("on");
+      el.classList.toggle("on",v);
+      S[key]=v; if(onChange) onChange(v); render();
+    });
+  }
+  bindSwitch("swKeep","keepDuration");
+  bindSwitch("swCanvas","canvas");
+  bindSwitch("swKeepFmt","keepFormat",function(v){
+    $("segFmt").style.opacity = v? ".4":"1";
+    $("segFmt").style.pointerEvents = v? "none":"auto";
+  });
+  bindSwitch("swPalette","palette");
+
+  // 数字 / 滑块
+  $("fpsTarget").addEventListener("input",function(){
+    var v=parseInt(this.value,10);
+    S.fpsTarget = isFinite(v)? v : 0;
+    S.fpsEnabled = S.fpsTarget>0;
+    render();
+  });
+  $("texRatio").addEventListener("input",function(){ S.texRatio=parseInt(this.value,10)/100; render(); });
+  $("texMaxEdge").addEventListener("input",function(){
+    var v=parseInt(this.value,10); S.texMaxEdge=isFinite(v)? v : 0;
+    S.texMode="maxEdge"; syncTexRadios(); render();
+  });
+  $("qRange").addEventListener("input",function(){ S.quality=parseInt(this.value,10); $("qVal").textContent=S.quality; render(); });
+  $("cvRatio").addEventListener("input",function(){ S.canvasRatio=parseInt(this.value,10)/100; $("cvVal").textContent=Math.round(S.canvasRatio*100)+"%"; render(); });
+
+  function syncTexRadios(){
+    [].forEach.call(document.querySelectorAll(".radio[data-tm]"),function(el){
+      el.classList.toggle("on", el.dataset.tm===S.texMode);
+    });
+  }
+  [].forEach.call(document.querySelectorAll(".radio[data-tm]"),function(el){
+    el.addEventListener("click",function(){ S.texMode=el.dataset.tm; syncTexRadios(); render(); });
+  });
+
+  // 格式分段
+  $("segFmt").addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+    S.format=b.dataset.f; render();
+  });
+
+  // 作用域
+  $("segScope").addEventListener("click",function(ev){
+    var b=ev.target.closest("button"); if(!b) return;
+    [].forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+    S.scope=b.dataset.s;
+  });
+
+  // 应用 / 恢复
+  $("btnApply").addEventListener("click",function(){
+    this.textContent="已应用到 3 项";
+    var self=this; setTimeout(function(){ self.textContent="应用到勾选的 3 项"; },1200);
+  });
+  $("btnReset").addEventListener("click",function(){
+    S.fpsTarget=20; S.keepDuration=true; S.texMode="none"; S.texRatio=1;
+    S.canvas=false; S.keepFormat=true; S.quality=70; S.palette=true;
+    $("fpsTarget").value=20; $("texRatio").value=100; $("qRange").value=70;
+    $("qVal").textContent="70"; $("cvRatio").value=80; $("cvVal").textContent="80%";
+    $("swKeep").classList.add("on"); $("swCanvas").classList.remove("on");
+    $("swKeepFmt").classList.add("on"); $("swPalette").classList.add("on");
+    $("segFmt").style.opacity=".4"; $("segFmt").style.pointerEvents="none";
+    syncTexRadios(); render();
+  });
+
+  // 按建议重压
+  $("btnAdvice").addEventListener("click",function(){
+    if(memAfter()<=S.budget) return;
+    var need=Math.sqrt(S.budget/S.baseMem);
+    S.texMode="ratio"; S.texRatio=Math.max(0.1,Math.round(need*100)/100);
+    $("texRatio").value=Math.round(S.texRatio*100);
+    syncTexRadios(); render();
+  });
+
+  // 文件勾选
+  var flBody=$("flBody");
+  function refreshCount(){
+    var boxes=[].filter.call(flBody.querySelectorAll("input.cb"),function(x){ return x.offsetParent!==null; });
+    var n=boxes.filter(function(x){ return x.checked; }).length;
+    $("flCnt").textContent="已勾选 "+n+" / 6";
+    $("btnScopeCnt").textContent = n? n+" 项" : "当前";
+    $("btnApply").textContent = n? ("应用到勾选的 "+n+" 项") : "先勾选文件";
+    $("btnApply").classList.toggle("dis", n===0);
+    $("checkAll").checked = n>0 && n===boxes.length;
+  }
+  flBody.addEventListener("change",function(ev){
+    if(ev.target.classList.contains("cb")) refreshCount();
+  });
+  flBody.addEventListener("click",function(ev){
+    var row=ev.target.closest(".fr"); if(!row) return;
+    if(ev.target.classList.contains("cb")) return;
+    [].forEach.call(flBody.querySelectorAll(".fr"),function(r){ r.classList.remove("cur"); });
+    row.classList.add("cur");
+    var nm=row.dataset.name;
+    if(nm){ $("stageFn").textContent=nm; }
+  });
+  $("checkAll").addEventListener("change",function(){
+    var v=this.checked;
+    [].forEach.call(flBody.querySelectorAll("input.cb"),function(x){ x.checked=v; });
+    refreshCount();
+  });
+
+  // 保存下拉：仅作示意，点击给出反馈
+  $("btnSave").addEventListener("click",function(){
+    var self=this, old=this.innerHTML;
+    this.innerHTML='保存 ▾ <span class="car" style="opacity:1">· 覆盖并备份 / 覆盖 / 副本</span>';
+    setTimeout(function(){ self.innerHTML=old; },1400);
+  });
+  $("btnCompress").addEventListener("click",function(){
+    var self=this, old=this.innerHTML;
+    this.innerHTML='压缩中…';
+    setTimeout(function(){ self.innerHTML=old; },900);
+  });
+
+  // 初始化
+  syncTexRadios();
+  render();
+  refreshCount();
+})();
+</script>
+</body>
+</html>

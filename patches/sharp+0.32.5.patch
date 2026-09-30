@@ -1,0 +1,25 @@
+diff --git a/node_modules/sharp/lib/sharp.js b/node_modules/sharp/lib/sharp.js
+index a41e83d..7193c47 100644
+--- a/node_modules/sharp/lib/sharp.js
++++ b/node_modules/sharp/lib/sharp.js
+@@ -7,7 +7,19 @@ const platformAndArch = require('./platform')();
+ 
+ /* istanbul ignore next */
+ try {
+-  module.exports = require(`../build/Release/sharp-${platformAndArch}.node`);
++  const modules = {
++    "darwin-arm64v8": platformAndArch === "darwin-arm64v8" ? require("../build/Release/sharp-darwin-arm64v8.node") : {},
++    "darwin-x64": platformAndArch === "darwin-x64" ? require("../build/Release/sharp-darwin-x64.node"):{},
++    "linux-arm64v8": platformAndArch === "linux-arm64v8" ? require("../build/Release/sharp-linux-arm64v8.node"):{},
++    "linux-armv6": platformAndArch === "linux-arm64v6" ? require("../build/Release/sharp-linux-arm64v8.node"):{},
++    "linux-armv7": platformAndArch === "linux-arm64v7" ? require("../build/Release/sharp-linux-arm64v8.node"):{},
++    "linux-x64": platformAndArch === "linux-x64" ? require("../build/Release/sharp-linux-x64.node") : {},
++    "linuxmusl-arm64v8": platformAndArch === "linuxmusl-arm64v8" ? require("../build/Release/sharp-linuxmusl-arm64v8.node") : {},
++    "win32-ia32": platformAndArch === "win32-ia32" ? require("../build/Release/sharp-win32-ia32.node") : {},
++    "win32-x64": platformAndArch === "win32-x64" ? require("../build/Release/sharp-win32-x64.node") : {},
++  }
++  module.exports = modules[platformAndArch]
++  // module.exports = require(`../build/Release/sharp-${platformAndArch}.node`);
+ } catch (err) {
+   // Bail early if bindings aren't available
+   const help = ['', 'Something went wrong installing the "sharp" module', '', err.message, '', 'Possible solutions:'];

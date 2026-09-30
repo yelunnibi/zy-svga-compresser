@@ -1,0 +1,28 @@
+.vscode/**
+.vscode-test/**
+out/**
+node_modules/**
+src/**
+.gitignore
+.yarnrc
+webpack.config.js
+vsc-extension-quickstart.md
+**/tsconfig.json
+**/.eslintrc.json
+**/*.map
+**/*.ts
+.idea
+.DS_Store
+.mikas
+.zy-svga
+release
+test
+design
+patches
+bin
+assets/native-node
+
+# 上面 node_modules/** 只针对工程根目录，这里显式确认把构建产物里的 vendor 原生依赖打进去：
+# dist/node_modules/sharp/{build/Release,vendor} 是 sharp 运行时加载 libvips 的必要文件
+!dist/node_modules/**
+

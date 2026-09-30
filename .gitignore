@@ -1,0 +1,12 @@
+out
+dist
+node_modules
+.vscode-test/
+.idea
+.DS_Store
+.mikas
+.zy-svga
+release
+*.vsix
+*.log
+*.tmp
