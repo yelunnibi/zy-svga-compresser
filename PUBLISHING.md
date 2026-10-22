@@ -77,3 +77,44 @@ npx ovsx publish release/svgazip-0.0.8.vsix -p <open-vsx-token>
 ```
 
 需要 Eclipse 账号，并创建与 publisher 同名的命名空间 `zynigo`。
+
+## 六、GitHub Release 分发（不走市场，也能给别人装）
+
+`.github/workflows/release.yml` 已配好：
+
+| 触发 | 产物 |
+|---|---|
+| push 到 `main` | Actions artifact（保留 30 天） |
+| push tag `v*` | GitHub Release，含 `svgazip-<version>.vsix` + 固定名 `svgazip.vsix` |
+
+发版：
+
+```bash
+# 1. 改 package.json 的 version（或 npm version patch --no-git-tag-version）
+git commit -am "chore: release v0.0.12"
+git push
+git tag v0.0.12 && git push origin v0.0.12
+```
+
+tag 与 `package.json` 版本不一致时 CI 会直接 fail，防止发出错版本的包。
+
+用户安装（**必须两步**）：
+
+```bash
+curl -fL -o /tmp/svgazip.vsix \
+  https://github.com/yelunnibi/zy-svga-compresser/releases/latest/download/svgazip.vsix
+code --install-extension /tmp/svgazip.vsix --force
+```
+
+> **`code --install-extension <URL>` 不可用**（VS Code 1.143.0 实测）：
+> CLI 的 `asExtensionIdOrVSIX()` 只判断字符串是否以 `.vsix` 结尾，是就转成**本地路径**，
+> 于是 `https://...` 变成 `$PWD/https:/github.com/...`，报 `ENOENT`。
+> 官方支持的只有 `<扩展ID>` 或 `<本地 vsix 路径>` 两种形式。
+
+### 为什么不用 `--target` 打多平台包
+
+VS Code 支持 `vsce package --target darwin-arm64` 这类按平台打包，但本扩展的 vsix 是**一个包内含多平台原生库**（7 个 `sharp-*.node` + macOS libvips ×2 + Windows DLL ×4），
+用户在 mac/win 装同一个文件即可。代价是体积 26MB；好处是不用让用户选对平台包。
+
+CI 必须显式跑 `npm run setup:native`：Linux runner 上 `npm ci` 只会拿到 `linux-x64` 的 sharp 原生模块，
+不补的话产物在 mac/win 上装得上但一启动就崩。`scripts/verify-dist-native.js` 会在打包前硬拦这种残缺产物。
