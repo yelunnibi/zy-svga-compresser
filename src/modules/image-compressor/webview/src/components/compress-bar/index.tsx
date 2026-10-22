@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { SvgaCompressOptions } from "@typing";
-import { computeActualFps } from "@components/svga-panel";
+import { computeFpsPlan } from "@components/svga-panel";
 
 /**
  * 顶部横向参数条。
@@ -140,9 +140,10 @@ export default function CompressBar(props: CompressBarProps) {
   // 目标 fps 缺省时给一个「源帧率的一半」，避免刚打开开关时滑块停在 0
   const defaultTarget = originFps > 1 ? Math.max(1, Math.floor(originFps / 2)) : 0;
   const fpsTarget = fps.target > 0 ? fps.target : defaultTarget;
-  const actualFps = computeActualFps(originFps, fpsTarget, fps.keepDuration);
-  const frameStep = fps.keepDuration && actualFps > 0 ? Math.max(1, Math.round(originFps / actualFps)) : 1;
-  const actualFrames = frameStep > 1 ? Math.ceil(originFrames / frameStep) : originFrames;
+  const plan = computeFpsPlan(originFps, originFrames, fpsTarget, fps.keepDuration);
+  const actualFps = plan.fps;
+  const frameStep = plan.dropped && originFrames > plan.frames ? Math.round((originFrames / plan.frames) * 100) / 100 : 1;
+  const actualFrames = plan.dropped ? plan.frames : originFrames;
   const duration = actualFps > 0 ? Math.round((actualFrames / actualFps) * 10) / 10 : 0;
   const fpsActive = fps.enabled && fpsTarget > 0 && originFps > 0 && fpsTarget < originFps;
 
@@ -194,7 +195,7 @@ export default function CompressBar(props: CompressBarProps) {
           hint={
             fpsActive
               ? fps.keepDuration
-                ? `实际 ${actualFps} fps · 帧 ${originFrames} → ${actualFrames} · 时长 ${duration}s 不变`
+                ? `实际 ${actualFps} fps · 帧 ${originFrames} → ${actualFrames}${frameStep > 1 ? `（每 ${frameStep} 帧取 1）` : ""} · 时长 ${duration}s 不变`
                 : `只改数值 · 帧数不变 · 时长变 ${duration}s`
               : "关：不动帧，体积几乎不变"
           }

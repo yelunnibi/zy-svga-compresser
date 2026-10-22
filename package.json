@@ -1,9 +1,9 @@
 {
   "name": "svgazip",
   "displayName": "ZY SVGA Compresser",
-  "description": "Compress PNG/JPG/WebP/SVG/GIF/SVGA faster and better. Adds tunable SVGA compression (fps frame-dropping, texture resolution, canvas scaling), decoded-memory estimation, and one-click overwrite with automatic backup.",
-  "homepage": "https://github.com/AkiraBit/Mikas/blob/main/README.md",
-  "version": "0.0.8",
+  "description": "SVGA compression for VS Code: drop frames, shrink texture resolution and canvas size, cut decoded memory - then compress PNG/JPG/WebP/SVG/GIF too. Includes per-texture logging, decoded-memory estimates, one-click overwrite with automatic backup.",
+  "homepage": "https://github.com/yelunnibi/zy-svga-compresser#readme",
+  "version": "0.0.11",
   "license": "MIT",
   "author": "JaylenLee",
   "publisher": "zynigo",
@@ -17,28 +17,40 @@
     "url": "https://github.com/yelunnibi/zy-svga-compresser.git"
   },
   "keywords": [
-    "tinypng",
-    "TinyPNG",
-    "Tinypng",
-    "svg",
-    "SVG",
-    "SVGO",
-    "svgo",
     "svga",
-    "SVGA",
+    "svga compress",
+    "svga compression",
+    "svga compressor",
+    "svga压缩",
+    "动画压缩",
+    "图片压缩",
     "compress",
+    "compression",
     "image compress",
-    "decode memory",
-    "jpg",
+    "optimize",
+    "svg",
+    "svg compress",
+    "svgo",
     "png",
-    "webp"
+    "jpg",
+    "jpeg",
+    "webp",
+    "gif",
+    "animation",
+    "frame rate",
+    "texture",
+    "decoded memory",
+    "memory",
+    "tinypng",
+    "android",
+    "apk size",
+    "asset"
   ],
   "engines": {
     "vscode": "^1.56.0"
   },
   "categories": [
-    "Other",
-    "Snippets"
+    "Other"
   ],
   "activationEvents": [
     "onCommand:zy-svga.compress",
@@ -141,7 +153,7 @@
           "order": 2,
           "type": "boolean",
           "default": false,
-          "description": "Legacy option. When enabled and zy-svga.saveMode is not set, overwrite is used as the default save mode."
+          "description": "Legacy option. When enabled and zy-svga.saveMode is not set, overwrite is used as the default save mode. A backup is always created before overwriting."
         },
         "zy-svga.compressedFilePostfix": {
           "order": 3,
@@ -170,16 +182,14 @@
           "type": "string",
           "enum": [
             "copy",
-            "overwrite",
             "overwriteWithBackup"
           ],
           "enumDescriptions": [
             "Save as a .min copy, keep the original file untouched",
-            "Overwrite the original file directly, no backup (irreversible)",
-            "Overwrite the original file and back it up to .zy-svga/backup/ (recommended)"
+            "Overwrite the original file and back it up to .zy-svga/backup/ first (recommended)"
           ],
           "default": "copy",
-          "markdownDescription": "Default way to write compressed results to disk. The panel lets you override this per action."
+          "markdownDescription": "Default way to write compressed results to disk. Any overwrite always creates a backup first (a plain \"overwrite\" without backup is no longer available)."
         },
         "zy-svga.svgaOptions": {
           "order": 7,

@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
-import { Dropdown, Tree, Tooltip } from "antd";
+import { Tree, Tooltip } from "antd";
 import type { DataNode, TreeProps } from "antd/es/tree";
 import { formatFileSize, formatReducedRate, vscode, workspaceParse, WorkspaceParsedInfo } from "@utils";
 import {
@@ -686,18 +686,15 @@ function App() {
             {isSaving ? <Loading3QuartersOutlined spin /> : <SaveOutlined />}
             保存为副本
           </button>
-          <Dropdown
-            menu={{
-              items: saveModeMenuItems,
-              onClick: ({ key }) => handleSave(key as SaveMode),
-            }}
-            disabled={!canSaveSelected}
-          >
-            <button className={`${HEADER_BTN} border-[#5a5a5a] bg-transparent text-[#d4d4d4] hover:bg-[#3d3d3d]`} disabled={!canSaveSelected}>
-              覆盖原文件
-              <CaretDownOutlined className="text-[10px]" />
+          <Tooltip title="覆盖前会自动把原文件备份到工作区的 .zy-svga/backup，可用右键菜单或通知里的「还原」恢复">
+            <button
+              className={`${HEADER_BTN} border-[#5a5a5a] bg-transparent text-[#d4d4d4] hover:bg-[#3d3d3d]`}
+              disabled={!canSaveSelected}
+              onClick={() => handleSave(SaveMode.OverwriteWithBackup)}
+            >
+              覆盖原文件（自动备份）
             </button>
-          </Dropdown>
+          </Tooltip>
 
           <div className="flex-1"></div>
 

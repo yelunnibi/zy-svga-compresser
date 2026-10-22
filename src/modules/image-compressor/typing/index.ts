@@ -189,11 +189,20 @@ export interface SvgaAppliedPlan {
   originFps: number;
   /** 原始总帧数 */
   originFrames: number;
-  /** 实际生效的 fps（丢帧只能按整数倍抽帧，可能与目标值有偏差） */
+  /**
+   * 实际生效的 fps。
+   *
+   * 丢帧保时长时它就是**取整后的目标帧率**（`MovieParams.fps` 是 int32，存不了小数），
+   * 帧数按「时长不变」反推（帧数 ≈ 原帧数 × fps ÷ 原 fps），所以可能与原始帧率、
+   * 也可能与理论时长有不到半帧的误差。
+   */
   fps: number;
   /** 实际生效的总帧数 */
   frames: number;
-  /** 抽帧步长，1 表示未抽帧 */
+  /**
+   * 平均抽帧步长 = 原帧数 ÷ 产物帧数（**可含小数**，如 1.54）。
+   * 1 表示未抽帧；>1 表示确实抽掉了帧。仅用于回显，不参与计算。
+   */
   frameStep: number;
   /** 纹理统一缩放比例（maxEdge 模式下为估计值） */
   textureScale: number;

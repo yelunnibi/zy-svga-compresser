@@ -51,6 +51,51 @@ function StageOverlay(props: { state: MediaState; hint?: string }) {
   );
 }
 
+/**
+ * 兼容 svgaplayerweb 的渲染缺陷，消除「压缩后图形错位」的预览误报。
+ *
+ * 该播放器的 Renderer.drawSprite 有两条画图分支：
+ *   ① src 是字符串（base64 / URL）  → ctx.drawImage(img, 0, 0, layout.width, layout.height)，按 layout 拉伸 ✅
+ *   ② src 是 <img> 对象（解码缓存命中）→ ctx.drawImage(img, 0, 0)，按图片原始像素绘制，完全无视 layout ❌
+ *
+ * prepare() 会把每一张内嵌 base64 图都解码成 <img> 存进 _bitmapCache，所以实际永远走 ②。
+ * 原始 SVGA 的纹理像素恰好等于 layout（导出器的约定），两条分支结果一致，因此这个坑一直没暴露；
+ * 但本插件会把纹理像素缩小（如 304x376 → 243x301），② 就会把整张位图按 80% 画出来，
+ * 而矢量图层走 shape 分支、不受影响地停在原位 —— 预览里看着就像「机器人眼睛跑到了身体上」。
+ * Android / iOS / Flutter 播放器都是按 layout 拉伸，**压缩产物本身没有任何问题**。
+ *
+ * 做法：把图片塞进优先级最高的 _dynamicImage，并补上 `data:` 前缀（否则裸 base64 又会落回 ②），
+ * 强制播放器走 ①，让预览与真机渲染一致。
+ */
+interface LayoutAwarePlayer {
+  setImage(url: string, forKey: string): void;
+  _renderer?: { _bitmapCache?: Record<string, HTMLImageElement & { _svgaSrc?: string }> };
+}
+
+function forceLayoutAwareImages(player: SVGA.Player, item: SVGA.VideoEntity) {
+  const images = (item as unknown as { images?: Record<string, unknown> })?.images;
+  if (!images) return;
+  const p = player as unknown as LayoutAwarePlayer;
+  const cache = p._renderer?._bitmapCache;
+  Object.keys(images).forEach((key) => {
+    const value = images[key];
+    if (typeof value !== "string" || value.startsWith("data:")) return;
+    const url = value.startsWith("iVBO")
+      ? `data:image/png;base64,${value}`
+      : value.startsWith("/9j/2w")
+      ? `data:image/jpeg;base64,${value}`
+      : null;
+    if (!url) return;
+    const bitmapKey = key.replace(/\.matte$/, "");
+    // 让 .matte 键复用已解码的位图，避免换分支后重新异步加载
+    if (cache && cache[bitmapKey] && !cache[key]) cache[key] = cache[bitmapKey];
+    // 预置 _svgaSrc，避免播放器对同一个 data URL 再赋一次 src 触发重解码
+    const img = cache?.[bitmapKey];
+    if (img) img._svgaSrc = url;
+    p.setImage(url, bitmapKey);
+  });
+}
+
 export interface PreviewStackProps {
   file: WorkspaceNode | null;
   /** 本次参数下是否已有压缩结果 */
@@ -135,6 +180,8 @@ export default function PreviewStack(props: PreviewStackProps) {
         (item) => {
           if (disposed) return;
           player.setVideoItem(item);
+          // 必须在 setVideoItem（内部 prepare() 建好解码缓存）之后调用
+          forceLayoutAwareImages(player, item);
           readyRef.current[slot] = true;
           drawnRef.current[slot] = -1;
           try {

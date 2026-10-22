@@ -55,12 +55,31 @@ const radioDotCls = (active: boolean) =>
     active ? "border-[4px] border-[#0e639c]" : "border-[#5a5a5a]"
   }`;
 
-/** 计算丢帧后的实际 fps：抽帧只能按整数倍，实际值常与目标值不同 */
-export function computeActualFps(originFps: number, targetFps: number, keepDuration: boolean): number {
-  if (!originFps || !targetFps || targetFps >= originFps) return originFps;
-  if (!keepDuration) return targetFps;
-  const step = Math.max(1, Math.round(originFps / targetFps));
-  return Math.round((originFps / step) * 100) / 100;
+/**
+ * 计算丢帧保时长后「实际生效的帧率与帧数」。
+ *
+ * 与主进程 `planTransform` 保持同一口径：
+ *   - 帧率取整（`MovieParams.fps` 是 int32，存不了小数），以取整后的目标帧率为锚；
+ *   - 帧数按「时长不变」反推：`round(originFrames × fps / originFps)`；
+ *   - 目标帧率与原帧率过于接近、抽不出整帧时，维持原样。
+ *
+ * 老实现是「先定整数步长再倒推帧率」（`round(originFps/target)`），
+ * 结果用户设 13fps 实际只拿到 10fps，而且 20/3 这种分数被 int32 截断后
+ * 时长会被拉长（100 帧 @20fps 设 7fps → 34 帧 @6fps = 5.667s，原 5s）。
+ */
+export function computeFpsPlan(
+  originFps: number,
+  originFrames: number,
+  targetFps: number,
+  keepDuration: boolean
+): { fps: number; frames: number; dropped: boolean } {
+  const base = { fps: originFps, frames: originFrames, dropped: false };
+  if (!originFps || !targetFps || targetFps >= originFps) return base;
+  if (!keepDuration || !originFrames) return { fps: targetFps, frames: originFrames, dropped: false };
+  const target = Math.max(1, Math.round(targetFps));
+  const frames = Math.max(1, Math.round((originFrames * target) / originFps));
+  if (target >= originFps || frames >= originFrames) return base;
+  return { fps: target, frames, dropped: true };
 }
 
 export interface SvgaPanelProps {
@@ -81,11 +100,12 @@ export default function SvgaPanel(props: SvgaPanelProps) {
   const { options, scope, hasFile, selectedCount, originFps = 0, originFrames = 0, disabled, onScopeChange, onChange, onApplyToSelected, onResetFile } = props;
   const { fps, texture, canvas, encode } = options;
 
-  const actualFps = computeActualFps(originFps, fps.target, fps.keepDuration);
   const fpsActive = fps.enabled && fps.target > 0 && originFps > 0 && fps.target < originFps;
-  const step = fpsActive && fps.keepDuration ? Math.max(1, Math.round(originFps / fps.target)) : 1;
-  const actualFrames = step > 1 ? Math.ceil(originFrames / step) : originFrames;
-  const duration = actualFps > 0 ? Math.round((actualFrames / actualFps) * 10) / 10 : 0;
+  const plan = computeFpsPlan(originFps, originFrames, fps.target, fps.keepDuration);
+  const actualFps = plan.fps;
+  const step = plan.dropped && originFrames > plan.frames ? Math.round((originFrames / plan.frames) * 100) / 100 : 1;
+  const actualFrames = plan.dropped ? plan.frames : originFrames;
+  const duration = plan.fps > 0 ? Math.round((actualFrames / plan.fps) * 10) / 10 : 0;
 
   return (
     <div className={`h-full overflow-auto px-[12px] py-[10px] bg-[#2b2b2b] ${disabled ? "opacity-60 pointer-events-none" : ""}`}>
@@ -140,7 +160,7 @@ export default function SvgaPanel(props: SvgaPanelProps) {
       {fpsActive && (
         <div className="text-[10px] text-sky-400 leading-[1.6] mb-[6px]">
           {fps.keepDuration
-            ? `实际生效 ${actualFps} fps · 帧数 ${originFrames} → ${actualFrames} · 时长 ${duration}s`
+            ? `实际生效 ${actualFps} fps · 帧数 ${originFrames} → ${actualFrames}${step > 1 ? `（平均每 ${step} 帧取 1）` : ""} · 时长 ${duration}s`
             : `实际生效 ${fps.target} fps · 帧数不变 · 时长变为 ${duration}s`}
         </div>
       )}

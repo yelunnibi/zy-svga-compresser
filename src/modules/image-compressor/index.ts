@@ -993,9 +993,12 @@ export class ImageCompressor {
       logger.info("performSave", `${files.length} 个产物校验通过，可以覆盖`);
     }
 
+    // ⚠️ 覆盖类操作一律强制备份：Overwrite 与 OverwriteWithBackup 行为统一。
+    // 历史事故：曾允许「直接覆盖不备份」，导致原文件被压缩产物不可逆覆盖（slop_area.svga 已丢失）。
+    // 备份只增加磁盘占用（保留最近 N 批），但能杜绝不可逆的数据丢失，因此不再提供"不备份"通路。
     let backup: BackupEntry | null = null;
-    if (mode === SaveMode.OverwriteWithBackup) {
-      logger.info("performSave", `备份 ${files.length} 个原文件…`);
+    if (isOverwrite) {
+      logger.info("performSave", `备份 ${files.length} 个原文件…（覆盖模式强制备份）`);
       backup = await backupService.create(
         workspaceRoot,
         files.map((file) => file.sourceFsPath)
@@ -1087,11 +1090,11 @@ export class ImageCompressor {
       const failed = results.filter((item) => item.status === ExecutedStatus.Rejected);
       if (failed.length) {
         vscode.window.showWarningMessage(`${results.length - failed.length} 个文件处理完成，${failed.length} 个失败`);
-      } else if (mode === SaveMode.OverwriteWithBackup && backup) {
+      } else if (backup) {
         vscode.window
           .showInformationMessage(`${results.length} 个文件已覆盖原文件，原文件已备份`, "还原")
           .then((choice) => {
-            if (choice === "还原") this.restoreBackup(backup.timestamp);
+            if (choice === "还原") this.restoreBackup(backup!.timestamp);
           });
       } else {
         vscode.window.showInformationMessage(`${results.length} pictures operation completed`);
@@ -1536,15 +1539,15 @@ export class ImageCompressor {
   /**
    * 默认落盘方式。
    *
-   * 保留了旧配置 forceOverwrite 的兼容：老用户打开该开关时，
-   * 默认识别为"直接覆盖"，行为与升级前一致。
+   * 「覆盖」类一律归一到「覆盖并备份」——不再提供"直接覆盖、不备份"的通路，
+   * 因为误用会造成不可逆的原文件丢失。旧配置里若写了 overwrite 也按带备份处理；
+   * 旧开关 forceOverwrite 同样按带备份处理（行为比升级前更安全）。
    */
   private get saveModeConfig(): SaveMode {
     const raw = vscode.workspace.getConfiguration(CONFIG_SECTION).get<string>(CONFIG_KEY.SaveMode);
-    if (raw === SaveMode.Copy || raw === SaveMode.Overwrite || raw === SaveMode.OverwriteWithBackup) {
-      return raw as SaveMode;
-    }
-    return this.forceOverwriteConfig ? SaveMode.Overwrite : SaveMode.Copy;
+    if (raw === SaveMode.Copy) return SaveMode.Copy;
+    if (raw === SaveMode.Overwrite || raw === SaveMode.OverwriteWithBackup) return SaveMode.OverwriteWithBackup;
+    return this.forceOverwriteConfig ? SaveMode.OverwriteWithBackup : SaveMode.Copy;
   }
 
   private get memoryBudgetConfig(): number {

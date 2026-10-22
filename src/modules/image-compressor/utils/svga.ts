@@ -64,6 +64,77 @@ function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * 按比例缩放 SVG 路径字符串（`ShapeArgs.d` 与 `FrameEntity.clipPath`）。
+ *
+ * 为什么需要它：SVGA 的矢量路径是一段 SVG path 字符串（`d`），它与 rect/ellipse
+ * 处在**同一套坐标系**里。画布缩放（applyCanvasScale）会等比放大 viewBox 与所有
+ * 几何坐标，如果唯独落下路径字符串，路径类矢量就会停留在旧坐标上，相对其它图层错位。
+ *
+ * 缩放规则：
+ * - 所有坐标数值 ×scale（绝对指令与相对指令的位移量都要缩放）；
+ * - 唯一例外是 `A`/`a`（椭圆弧）指令：第 3 个参数（x 轴旋转角）与第 4、5 个参数
+ *   （large-arc / sweep 标志位）是无量纲的，保持原值；
+ * - 标志位允许与相邻数值连写（如 `011`），按单字符读取。
+ */
+export function scalePathData(d: string, scale: number): string {
+  if (!d || !Number.isFinite(scale) || scale <= 0 || scale === 1) return d;
+  const tokens: string[] = [];
+  const len = d.length;
+  let i = 0;
+  let cmd = "";
+  let argIndex = 0;
+
+  while (i < len) {
+    const ch = d[i];
+    if (ch === " " || ch === "," || ch === "\n" || ch === "\r" || ch === "\t" || ch === "\f") {
+      i++;
+      continue;
+    }
+    if (/[a-zA-Z]/.test(ch)) {
+      cmd = ch;
+      argIndex = 0;
+      tokens.push(ch);
+      i++;
+      continue;
+    }
+
+    const lower = cmd.toLowerCase();
+    const slot = argIndex % 7;
+    const isArcFlag = lower === "a" && (slot === 3 || slot === 4);
+    const isArcRotation = lower === "a" && slot === 2;
+
+    if (isArcFlag) {
+      tokens.push(d[i] === "1" ? "1" : "0");
+      i++;
+      argIndex++;
+      continue;
+    }
+
+    const start = i;
+    if (d[i] === "+" || d[i] === "-") i++;
+    while (i < len && d[i] >= "0" && d[i] <= "9") i++;
+    if (d[i] === ".") {
+      i++;
+      while (i < len && d[i] >= "0" && d[i] <= "9") i++;
+    }
+    if (d[i] === "e" || d[i] === "E") {
+      let j = i + 1;
+      if (d[j] === "+" || d[j] === "-") j++;
+      if (d[j] >= "0" && d[j] <= "9") {
+        i = j;
+        while (i < len && d[i] >= "0" && d[i] <= "9") i++;
+      }
+    }
+    let value = parseFloat(d.slice(start, i));
+    if (!Number.isFinite(value)) value = 0;
+    tokens.push(String(isArcRotation ? round2(value) : round2(value * scale)));
+    argIndex++;
+  }
+
+  return tokens.join(" ");
+}
+
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
@@ -226,9 +297,17 @@ class SvgaUtility {
   /**
    * 计算实际生效的压缩计划，不修改数据。
    *
-   * 抽帧只能按整数倍进行（每 k 帧取 1 帧），所以实际 fps 可能不是整数目标值，
-   * 例如原 24fps 目标 10fps 时，只能取步长 2，实际为 12fps。这点必须在界面上
-   * 如实回显，否则用户会误以为参数没生效。
+   * 「丢帧保时长」的做法：把目标帧率取整后当作**真正生效的帧率**，再按
+   * 帧数 ≈ 原帧数 × 新帧率 ÷ 原帧率 反推帧数（这样 帧数/帧率 ≈ 原时长）。
+   * 之所以必须以帧率为锚、而不是像以前那样先定整数步长，
+   * 是因为 `MovieParams.fps` 在 protobuf 里是 **int32**，小数会被截断：
+   * 老写法 `fps = round2(originFps / frameStep)` 遇到 20/3 = 6.67 会存成 6，
+   * 于是「保时长」反而把时长拉长了（100 帧 step3 → 34 帧 @6fps = 5.667s，原 5s），
+   * 而且实际帧率常常离用户设的目标很远（20fps 设目标 13 实际只有 10）。
+   *
+   * 代价：帧数取整会带来不超过半帧的时长误差（≤ 0.5/新帧率 秒，10fps 时 ≤50ms），
+   * 换来的是**目标帧率被如实执行**。界面上的 `frameStep` 是平均步长
+   * （原帧数 ÷ 产物帧数，可含小数），>1 即表示确实抽掉了帧。
    */
   public planTransform(movieEntity: SvgaParsed.MovieEntity, options: SvgaCompressOptions): SvgaAppliedPlan {
     const params = movieEntity?.params || ({} as SvgaParsed.MovieParams);
@@ -241,14 +320,20 @@ class SvgaUtility {
 
     const wantFps = options.fps?.enabled ? options.fps.target : 0;
     if (wantFps > 0 && originFps > 0 && wantFps < originFps) {
-      if (options.fps.keepDuration) {
-        // 丢帧重采样：抽掉多余帧，时长保持不变
-        frameStep = Math.max(1, Math.round(originFps / wantFps));
-        fps = round2(originFps / frameStep);
-        frames = Math.ceil(originFrames / frameStep);
+      if (options.fps.keepDuration && originFrames > 0) {
+        // 丢帧保时长：帧率取整（int32 存不了小数），帧数按「时长不变」反推
+        const target = Math.max(1, Math.round(wantFps));
+        const nextFrames = Math.max(1, Math.round((originFrames * target) / originFps));
+        if (target < originFps && nextFrames < originFrames) {
+          fps = target;
+          frames = nextFrames;
+          frameStep = round2(originFrames / nextFrames);
+        }
+        // 目标帧率与原帧率过于接近（抽不出整帧）时维持原样，不产生无意义的改动
       } else {
-        // 只改数值：时长改变，体积几乎不变
-        fps = wantFps;
+        // 只改数值：时长改变，体积几乎不变。
+        // 同样要取整 —— fps 存的是 int32，小数会被静默截断，回显的 fps 必须与落盘的数值一致。
+        fps = Math.max(1, Math.round(wantFps));
         frames = originFrames;
         frameStep = 1;
       }
@@ -416,23 +501,53 @@ class SvgaUtility {
     };
   }
 
-  /** 抽帧：每 step 帧保留 1 帧 */
-  private applyFrameStep(movieEntity: SvgaParsed.MovieEntity, step: number) {
-    if (!(step > 1)) return;
-    for (const sprite of movieEntity.sprites || []) {
-      if (!Array.isArray(sprite.frames)) continue;
-      sprite.frames = sprite.frames.filter((_, index) => index % step === 0);
-    }
+  /**
+   * 抽帧：把每个 sprite 的帧序列降采样到 `targetFrames` 帧。
+   *
+   * ⚠️ 绝不能用 `frames.filter((_, i) => i % step === 0)`。它保留的是
+   * 0, step, 2*step, … 这一串下标，当 n 不是 step 的整数倍时，最后一个入选
+   * 的下标只到 `step * floor((n-1)/step)`，**原片最后一帧（n-1）永远进不来**。
+   * 而播放器的终止条件是 `currentFrame = min(frames-1, …)`（player.js:185），
+   * 产物只会播到新的末帧 —— 于是原片结尾那段动画（往往是"最终定格/结果"）
+   * 被整段裁掉。0.0.10 之前的 slop_angle（100 帧 / step 2）就因此丢了第 99 帧，
+   * 机器人滑入到位的收尾段消失了。
+   *
+   * 实现是**首尾对齐的最近邻取样**：按 `k*(n-1)/(m-1)` 取下标，
+   * 保证 k=0 → 第 0 帧、k=m-1 → 第 n-1 帧，中间均匀落点。
+   * 支持任意目标帧数（含 100→65 这种非整除场景），不依赖整数步长。
+   */
+  private applyFrameStep(movieEntity: SvgaParsed.MovieEntity, targetFrames: number) {
     const params = movieEntity.params;
+    const originFrames = params?.frames || 0;
+    const want = Math.max(1, Math.floor(targetFrames || 0));
+    if (!(originFrames > 0) || want >= originFrames) return; // 未要求抽帧
+
+    for (const sprite of movieEntity.sprites || []) {
+      const frames = sprite.frames;
+      if (!Array.isArray(frames) || frames.length <= 1) continue;
+      const n = frames.length;
+      const m = Math.min(want, n);
+      if (m >= n) continue; // 该 sprite 本就不足一帧可抽，原样保留
+      const denom = m - 1;
+      const picked: SvgaParsed.FrameEntity[] = [];
+      for (let k = 0; k < m; k++) {
+        // m === 1 时 denom=0，退化为"只留末帧"（保住最终状态而非起始帧）
+        const idx = denom > 0 ? Math.round((k * (n - 1)) / denom) : n - 1;
+        picked.push(frames[Math.min(n - 1, Math.max(0, idx))]);
+      }
+      sprite.frames = picked;
+    }
+
     if (params) {
-      params.frames = Math.ceil((params.frames || 0) / step);
+      params.frames = Math.min(want, originFrames);
     }
   }
 
   /**
    * 画布与布局等比缩放。
    *
-   * 会同步缩放：viewBox、每帧 layout、transform 平移量、图形坐标与描边宽度。
+   * 会同步缩放：viewBox、每帧 layout、transform 平移量、裁切路径、图形坐标
+   * （rect/ellipse/矢量路径 d）、描边宽度与虚线参数。
    * transform 的 a/b/c/d 是线性部分（旋转与剪切），不含平移，因此保持不变。
    */
   private applyCanvasScale(movieEntity: SvgaParsed.MovieEntity, scale: number) {
@@ -455,6 +570,10 @@ class SvgaUtility {
           frame.transform.tx = round2(frame.transform.tx * scale);
           frame.transform.ty = round2(frame.transform.ty * scale);
         }
+        // 裁切路径是帧坐标系下的 SVG path 字符串，必须与 layout/transform 一起缩放
+        if (typeof frame.clipPath === "string" && frame.clipPath) {
+          frame.clipPath = scalePathData(frame.clipPath, scale);
+        }
         for (const shape of frame.shapes || []) {
           if (shape.rect) {
             shape.rect.x = round2(shape.rect.x * scale);
@@ -475,8 +594,21 @@ class SvgaUtility {
             shape.transform.tx = round2(shape.transform.tx * scale);
             shape.transform.ty = round2(shape.transform.ty * scale);
           }
-          if (shape.styles && typeof shape.styles.strokeWidth === "number") {
-            shape.styles.strokeWidth = round2(shape.styles.strokeWidth * scale);
+          // 矢量路径（ShapeArgs.d）：与 rect/ellipse 同一坐标系，之前漏缩导致路径类矢量错位
+          if (shape.shape && typeof shape.shape.d === "string") {
+            shape.shape.d = scalePathData(shape.shape.d, scale);
+          }
+          if (shape.styles) {
+            if (typeof shape.styles.strokeWidth === "number") {
+              shape.styles.strokeWidth = round2(shape.styles.strokeWidth * scale);
+            }
+            // 虚线段长与间隔同样是坐标系长度，需要一并缩放（miterLimit 是无量纲比值，不动）
+            for (const dashKey of ["lineDashI", "lineDashII", "lineDashIII"] as const) {
+              const dash = shape.styles[dashKey];
+              if (typeof dash === "number") {
+                shape.styles[dashKey] = round2(dash * scale);
+              }
+            }
           }
         }
       }
@@ -717,15 +849,25 @@ class SvgaUtility {
       // 3) 抽帧与帧率调整
       const t3 = Date.now();
       const applied = this.planTransform(movieEntity, options);
-      this.applyFrameStep(movieEntity, applied.frameStep);
+      this.applyFrameStep(movieEntity, applied.frames);
       if (movieEntity.params) {
         movieEntity.params.fps = applied.fps;
       }
       logger.info(
         flag,
         `[3/5] 抽帧 ${Date.now() - t3}ms：fps ${applied.originFps} → ${applied.fps}，` +
-          `帧 ${applied.originFrames} → ${applied.frames}，每 ${applied.frameStep} 帧取 1，时长 ${applied.duration}s`
+          `帧 ${applied.originFrames} → ${applied.frames}` +
+          (applied.frameStep > 1 ? `（平均每 ${applied.frameStep} 帧取 1，首尾帧对齐，末帧已保留）` : "（未抽帧）") +
+          `，时长 ${applied.duration}s`
       );
+      if (applied.frameStep > 1 && Math.abs(applied.duration - (applied.originFps > 0 ? applied.originFrames / applied.originFps : 0)) > 0.15) {
+        logger.warn(
+          flag,
+          `      注意：目标帧率取整后帧数无法整除，时长与原始略有偏差（原 ${round2(
+            applied.originFrames / applied.originFps
+          )}s → ${applied.duration}s）`
+        );
+      }
 
       // 4) 回收无引用纹理。
       // 放在抽帧之后、写盘之前：此时 images 已是最终要写盘的那批数据。
