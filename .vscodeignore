@@ -7,6 +7,9 @@ src/**
 .yarnrc
 webpack.config.js
 vsc-extension-quickstart.md
+PUBLISHING.md
+.github
+scripts/verify-dist-native.js
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map

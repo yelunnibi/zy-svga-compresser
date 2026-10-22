@@ -6,6 +6,41 @@ VSCode 扩展。在原 Mikas 图片压缩的基础上，把 **SVGA 动效压缩*
 
 ---
 
+## 安装
+
+### 方式一：从 GitHub Release 装（无需账号）
+
+```bash
+# macOS / Linux
+curl -fL -o /tmp/svgazip.vsix \
+  https://github.com/yelunnibi/zy-svga-compresser/releases/latest/download/svgazip.vsix
+code --install-extension /tmp/svgazip.vsix --force
+```
+
+```powershell
+# Windows PowerShell
+curl.exe -fL -o $env:TEMP\svgazip.vsix https://github.com/yelunnibi/zy-svga-compresser/releases/latest/download/svgazip.vsix
+code --install-extension $env:TEMP\svgazip.vsix --force
+```
+
+> **注意**：VS Code 的 `--install-extension` 只接受「扩展 ID」或「本地 vsix 路径」，
+> **不接受 http(s) 链接**（会把它当成本地路径，报 `ENOENT ... /https:/github.com/...`）。
+> 所以必须先下载再安装，两步走。这是官方 CLI 的现状，不是本扩展的限制。
+>
+> 从 VSIX 安装的扩展**不会自动更新**，新版本需要重新下载覆盖安装（带 `--force`）。
+
+### 方式二：图形界面
+
+下载 `.vsix` 后在 VS Code 里 `Ctrl/Cmd+Shift+P` → `Extensions: Install from VSIX...` → 选文件。
+
+### 方式三：扩展市场（若已上架）
+
+```bash
+code --install-extension zynigo.svgazip
+```
+
+---
+
 ## 一、它解决什么问题
 
 SVGA 用来看 UI 动效，比 GIF 小一个数量级。但它有两个天生的坑，素材在导出时不会帮你处理：
@@ -110,8 +145,8 @@ SVGA 用来看 UI 动效，比 GIF 小一个数量级。但它有两个天生的
 | 设置 | 默认 | 说明 |
 |---|---|---|
 | `zy-svga.tinypngApiKey` | 空 | 位图（PNG/JPG/WebP/GIF）压缩用。不配也能用 SVGA / SVG |
-| `zy-svga.saveMode` | `copy` | 默认写盘方式，面板里可单次覆盖 |
-| `zy-svga.forceOverwrite` | `false` | 遗留项：仅当 `saveMode` 未设置时生效 |
+| `zy-svga.saveMode` | `copy` | 默认写盘方式（`copy` 存副本 / `overwriteWithBackup` 覆盖并备份）。**任何覆盖都会先自动备份**，"直接覆盖不备份"已移除 |
+| `zy-svga.forceOverwrite` | `false` | 遗留项：仅当 `saveMode` 未设置时生效（同样会先备份） |
 | `zy-svga.compressedFilePostfix` | `.min` | 存副本时追加的后缀 |
 | `zy-svga.concurrency` | `6` | 并发任务数，调大可能增加 VSCode 内存占用 |
 | `zy-svga.ignore` | 见下 | 忽略的 Glob 列表，**每项必须以分号结尾** |
@@ -216,6 +251,31 @@ npm_config_registry=https://registry.npmmirror.com \
 - 主进程 TypeScript → `dist/extension.js`；webview 是 React 18 + Vite → `dist/image-compressor-dist/`。
 - `release/svgazip-<version>.vsix` 的命名来自 `package.json` 的 `name` + `version`。
 - 原生依赖必须保持目录层级（libvips 的 rpath 依赖相对位置），改动 `webpack.config.js` 的输出路径前请先读 `bin/setup-native.js`。
+
+### GitHub Actions 自动打包
+
+`.github/workflows/release.yml`：
+
+| 触发 | 结果 |
+|---|---|
+| push 到 `main` | 构建 + 打包，产物作为 workflow artifact 保留 30 天 |
+| push tag `v*`（如 `v0.0.12`） | 额外创建 GitHub Release，上传两个 asset：`svgazip-<version>.vsix` 与固定名 `svgazip.vsix` |
+
+```bash
+# 发版流程
+npm version patch --no-git-tag-version   # 或手动改 package.json
+git commit -am "chore: release v0.0.12"
+git push
+git tag v0.0.12 && git push origin v0.0.12
+```
+
+CI 里必做的三件事（少一件产物就是残的）：
+
+1. `npm ci` —— 跑 `postinstall`，把 Windows DLL 从 `assets/native-node` 拷进 `node_modules/sharp/build/Release`；
+2. `npm run setup:native` —— CI runner 是 Linux，sharp 只会装 `linux-x64` 的 `.node`，必须补 `darwin-arm64/x64`、`win32-x64/ia32` 与 macOS 的 libvips；
+3. `node scripts/verify-dist-native.js` —— 打包前硬校验原生依赖齐全，缺一个就 fail，避免「装得上但启动崩」。
+
+`v*` tag 会校验 tag 与 `package.json` 的 `version` 是否一致，不一致直接 fail。
 
 ### 平台支持
 

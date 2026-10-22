@@ -1,0 +1,119 @@
+name: build-and-release
+
+# push 到 main：只构建 + 上传 artifact（验证是否可打包）
+# 打 tag v*：构建 + 建 GitHub Release，供 code --install-extension 下载
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/modules/image-compressor/webview/package-lock.json
+
+      - name: 安装根目录依赖
+        run: npm ci
+
+      # sharp 的 npm 安装脚本只拉当前平台（linux-x64），发布产物需要带上
+      # darwin-arm64/x64 与 win32-x64 的原生模块和 libvips，否则用户在 mac/win 装了会崩
+      - name: 补全跨平台原生依赖
+        run: npm run setup:native
+
+      - name: 安装 webview 依赖
+        run: npm ci
+        working-directory: src/modules/image-compressor/webview
+
+      - name: 构建
+        run: npm run build
+
+      - name: 校验构建产物（原生依赖齐全）
+        run: node scripts/verify-dist-native.js
+
+      - name: 读取版本号
+        id: meta
+        run: |
+          node -e '
+            const p = require("./package.json");
+            const fs = require("fs");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${p.version}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `name=${p.name}\n`);
+          '
+
+      - name: 校验 tag 与 package.json 版本一致
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$TAG" != "${{ steps.meta.outputs.version }}" ]; then
+            echo "::error::tag v$TAG 与 package.json 的 ${{ steps.meta.outputs.version }} 不一致，请先改版本号"
+            exit 1
+          fi
+
+      - name: 打包 vsix
+        run: npx --yes @vscode/vsce@3.2.1 package --out release
+
+      - name: 生成固定文件名副本（供 releases/latest/download 永久链接）
+        run: |
+          cp "release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.vsix" \
+             "release/${{ steps.meta.outputs.name }}.vsix"
+          ls -lh release/
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ steps.meta.outputs.version }}
+          path: release/*.vsix
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 发布 Release（仅 tag 触发）
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ZY SVGA Compresser ${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.vsix
+            release/${{ steps.meta.outputs.name }}.vsix
+          body: |
+            ## 安装
+
+            命令行（macOS / Linux）：
+
+            ```bash
+            curl -fL -o /tmp/svgazip.vsix \
+              https://github.com/${{ github.repository }}/releases/latest/download/svgazip.vsix
+            code --install-extension /tmp/svgazip.vsix --force
+            ```
+
+            PowerShell（Windows）：
+
+            ```powershell
+            curl.exe -fL -o $env:TEMP\svgazip.vsix https://github.com/${{ github.repository }}/releases/latest/download/svgazip.vsix
+            code --install-extension $env:TEMP\svgazip.vsix --force
+            ```
+
+            或在 VS Code 里：`Ctrl/Cmd+Shift+P` → `Extensions: Install from VSIX...` → 选择下载好的文件。
+
+            > 支持平台：macOS (arm64 / x64)、Windows (x64)。Linux 版未随包附带 libvips，暂不支持。
+            > 从 VSIX 安装的扩展不会自动更新，升级需重新下载安装。
