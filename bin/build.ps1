@@ -9,3 +9,6 @@ cd ./src/modules/image-compressor/webview
 npm run build
 $buildImageCompressor = "Copy-Item -Path ./dist/ -Destination $pwdStr/dist/image-compressor-dist/ -Recurse"
 Invoke-Expression $buildImageCompressor
+
+# 裁掉 Linux 原生库（本项目不支持 Linux）
+node "$pwdStr/scripts/prune-dist-native.js"

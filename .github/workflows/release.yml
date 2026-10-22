@@ -48,10 +48,7 @@ jobs:
       - name: 构建
         run: npm run build
 
-      # CI runner 是 Linux，sharp 会自带一份 linux 的 libvips（~17MB），本项目不支持 Linux，裁掉
-      - name: 裁掉 Linux 原生库
-        run: node scripts/prune-dist-native.js
-
+      # bin/build.sh 末尾会自动裁掉 Linux 原生库（CI runner 是 Linux，sharp 会自带一份 ~17MB）
       - name: 校验构建产物（原生依赖齐全）
         run: node scripts/verify-dist-native.js
 
