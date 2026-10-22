@@ -71,7 +71,11 @@ jobs:
           fi
 
       - name: 打包 vsix
-        run: npx --yes @vscode/vsce@3.2.1 package --out release
+        run: |
+          # vsce 的 --out 在目标目录不存在时会把它当成文件名（生成一个叫 release 的文件），
+          # 所以必须先建目录
+          mkdir -p release
+          npx --yes @vscode/vsce@3.2.1 package --out release
 
       - name: 生成固定文件名副本（供 releases/latest/download 永久链接）
         run: |
